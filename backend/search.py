@@ -1185,13 +1185,11 @@ async def _search_tinyfish(query: str, max_results: int = 8, full_content_result
                     fetch_data = fetch_response.json()
 
                     # Process successful fetches
-                    fetched_urls: Set[str] = set()
                     for item in fetch_data.get("results", []):
                         url = item.get("url", "")
                         content = item.get("text", "")
                         idx = idx_map.get(url)
                         if idx is not None and content:
-                            fetched_urls.add(url)
                             if len(content) < 500:
                                 original_summary = search_results_data[idx]['summary']
                                 content += f"\n\n[System Note: Full content fetch yielded limited text. Appending original summary.]\nOriginal Summary: {original_summary}"
