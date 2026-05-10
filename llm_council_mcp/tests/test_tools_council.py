@@ -220,3 +220,108 @@ async def test_set_search_provider_valid_options(server):
             result = await server.call_tool("set_search_provider", {"provider": provider})
             text = get_text(result)
             assert "Error" not in text, f"Provider '{provider}' should be valid but got: {text}"
+
+
+# ── Extended configure_council tests ────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_configure_council_with_stage1_prompt(server):
+    with respx.mock:
+        respx.put("http://test:8001/api/settings").mock(
+            return_value=httpx.Response(200, json={"success": True})
+        )
+        result = await server.call_tool("configure_council", {
+            "stage1_prompt": "You are a helpful expert council member.",
+        })
+        text = get_text(result)
+        assert "Council updated successfully" in text
+
+
+@pytest.mark.asyncio
+async def test_configure_council_with_enabled_providers(server):
+    with respx.mock:
+        respx.put("http://test:8001/api/settings").mock(
+            return_value=httpx.Response(200, json={"success": True})
+        )
+        result = await server.call_tool("configure_council", {
+            "enabled_providers": {"openrouter": True, "ollama": False},
+        })
+        text = get_text(result)
+        assert "Council updated successfully" in text
+
+
+# ── set_api_key tests ────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_set_api_key_valid_provider(server):
+    with respx.mock:
+        respx.put("http://test:8001/api/settings").mock(
+            return_value=httpx.Response(200, json={"success": True})
+        )
+        result = await server.call_tool("set_api_key", {
+            "provider": "openai",
+            "api_key": "sk-test-key",
+        })
+        text = get_text(result)
+        assert "openai" in text
+        assert "saved" in text
+
+
+@pytest.mark.asyncio
+async def test_set_api_key_invalid_provider(server):
+    result = await server.call_tool("set_api_key", {"provider": "notreal", "api_key": "x"})
+    text = get_text(result)
+    assert "Error" in text
+    assert "notreal" in text
+
+
+# ── export_config tests ──────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_export_config(server):
+    with respx.mock:
+        respx.get("http://test:8001/api/settings/export").mock(
+            return_value=httpx.Response(200, json={
+                "council_models": ["openai:gpt-4.1"],
+                "openai_api_key": "sk-real-key",
+            })
+        )
+        result = await server.call_tool("export_config", {})
+        text = get_text(result)
+        assert "council_models" in text
+        assert "openai_api_key" in text
+
+
+# ── import_config tests ──────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_import_config_valid(server):
+    import json
+    with respx.mock:
+        respx.post("http://test:8001/api/settings/import").mock(
+            return_value=httpx.Response(200, json={"status": "imported"})
+        )
+        config = json.dumps({"council_models": ["openai:gpt-4.1", "anthropic:claude-sonnet-4"]})
+        result = await server.call_tool("import_config", {"config_json": config})
+        text = get_text(result)
+        assert "imported" in text.lower()
+
+
+@pytest.mark.asyncio
+async def test_import_config_invalid_json(server):
+    result = await server.call_tool("import_config", {"config_json": "not-json{"})
+    text = get_text(result)
+    assert "Error" in text
+
+
+# ── reset_config tests ───────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_reset_config(server):
+    with respx.mock:
+        respx.post("http://test:8001/api/settings/reset").mock(
+            return_value=httpx.Response(200, json={"status": "reset"})
+        )
+        result = await server.call_tool("reset_config", {})
+        text = get_text(result)
+        assert "reset" in text.lower()

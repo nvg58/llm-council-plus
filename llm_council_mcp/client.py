@@ -55,6 +55,24 @@ class CouncilClient:
         resp.raise_for_status()
         return resp.json()
 
+    async def export_settings(self) -> dict:
+        resp = await self.client.get(f"{self.base_url}/api/settings/export")
+        resp.raise_for_status()
+        return resp.json()
+
+    async def import_settings(self, data: dict) -> dict:
+        resp = await self.client.post(
+            f"{self.base_url}/api/settings/import",
+            json=data,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    async def reset_settings(self) -> dict:
+        resp = await self.client.post(f"{self.base_url}/api/settings/reset")
+        resp.raise_for_status()
+        return resp.json()
+
     # ── Models ───────────────────────────────────────────────────────────────
 
     async def get_openrouter_models(self) -> list[dict]:

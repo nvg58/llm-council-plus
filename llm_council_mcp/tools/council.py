@@ -56,7 +56,11 @@ def register(server, base_url: str) -> None:
         "'chat_ranking' (stages 1+2), 'chat_only' (stage 1 only). "
         "Models must be specified with provider prefix, e.g. 'openai:gpt-4.1', "
         "'anthropic:claude-sonnet-4', 'ollama:llama3'. "
-        "Requires 2-8 council models. Changes persist to settings."
+        "Requires 2-8 council models. "
+        "System prompts (stage1_prompt, stage2_prompt, stage3_prompt) and provider toggles "
+        "(enabled_providers: dict mapping provider name to bool, e.g. {'openrouter': True, 'ollama': False}; "
+        "direct_provider_toggles: dict mapping provider name to bool, e.g. {'openai': True, 'anthropic': False}) "
+        "can also be configured. Changes persist to settings."
     ))
     async def configure_council(
         models: list[str] | None = None,
@@ -65,6 +69,11 @@ def register(server, base_url: str) -> None:
         chairman_temperature: float | None = None,
         stage2_temperature: float | None = None,
         execution_mode: str | None = None,
+        stage1_prompt: str | None = None,
+        stage2_prompt: str | None = None,
+        stage3_prompt: str | None = None,
+        enabled_providers: dict[str, bool] | None = None,
+        direct_provider_toggles: dict[str, bool] | None = None,
     ) -> str:
         updates: dict = {}
         if models is not None:
@@ -83,6 +92,16 @@ def register(server, base_url: str) -> None:
             if execution_mode not in ("full", "chat_ranking", "chat_only"):
                 return f"Error: execution_mode must be 'full', 'chat_ranking', or 'chat_only'."
             updates["execution_mode"] = execution_mode
+        if stage1_prompt is not None:
+            updates["stage1_prompt"] = stage1_prompt
+        if stage2_prompt is not None:
+            updates["stage2_prompt"] = stage2_prompt
+        if stage3_prompt is not None:
+            updates["stage3_prompt"] = stage3_prompt
+        if enabled_providers is not None:
+            updates["enabled_providers"] = enabled_providers
+        if direct_provider_toggles is not None:
+            updates["direct_provider_toggles"] = direct_provider_toggles
 
         if not updates:
             return "No changes requested."
@@ -122,3 +141,61 @@ def register(server, base_url: str) -> None:
         if api_key:
             msg += " API key saved."
         return msg
+
+    @server.tool(description=(
+        "Set an API key for a named provider. "
+        "Supported providers: openrouter, openai, anthropic, google, mistral, deepseek, groq, "
+        "tinyfish, tavily, brave, serper. Changes persist to settings."
+    ))
+    async def set_api_key(provider: str, api_key: str) -> str:
+        PROVIDER_KEY_MAP = {
+            "openrouter": "openrouter_api_key",
+            "openai": "openai_api_key",
+            "anthropic": "anthropic_api_key",
+            "google": "google_api_key",
+            "mistral": "mistral_api_key",
+            "deepseek": "deepseek_api_key",
+            "groq": "groq_api_key",
+            "tinyfish": "tinyfish_api_key",
+            "tavily": "tavily_api_key",
+            "brave": "brave_api_key",
+            "serper": "serper_api_key",
+        }
+        if provider not in PROVIDER_KEY_MAP:
+            return f"Error: unknown provider '{provider}'. Valid: {', '.join(sorted(PROVIDER_KEY_MAP))}."
+        field = PROVIDER_KEY_MAP[provider]
+        async with CouncilClient(base_url) as client:
+            await client.update_settings(**{field: api_key})
+        return f"API key for '{provider}' saved."
+
+    @server.tool(description=(
+        "Export the full council configuration as JSON, including actual API key values. "
+        "Useful for backup or inspection. Returns the raw settings object."
+    ))
+    async def export_config() -> str:
+        async with CouncilClient(base_url) as client:
+            data = await client.export_settings()
+        return json.dumps(data, indent=2)
+
+    @server.tool(description=(
+        "Import a full council configuration from a JSON string. "
+        "Replaces all current settings. Provide the JSON exported by export_config."
+    ))
+    async def import_config(config_json: str) -> str:
+        try:
+            data = json.loads(config_json)
+        except json.JSONDecodeError as e:
+            return f"Error: invalid JSON — {e}"
+        async with CouncilClient(base_url) as client:
+            await client.import_settings(data)
+        return "Configuration imported successfully."
+
+    @server.tool(description=(
+        "Reset all council configuration to factory defaults. "
+        "This clears all API keys, custom models, and prompts. "
+        "Irreversible — export first if you want to keep current settings."
+    ))
+    async def reset_config() -> str:
+        async with CouncilClient(base_url) as client:
+            await client.reset_settings()
+        return "Configuration reset to defaults."
