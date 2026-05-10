@@ -519,6 +519,7 @@ class SearchProvider(str, Enum):
     TAVILY = "tavily"
     BRAVE = "brave"
     SERPER = "serper"
+    TINYFISH = "tinyfish"
 
 
 async def perform_web_search(
@@ -563,6 +564,9 @@ async def perform_web_search(
             return {"results": results, "extracted_query": extracted_query, "intent": "unknown"}
         elif provider == SearchProvider.SERPER:
             results = await _search_serper(extracted_query, max_results, full_content_results)
+            return {"results": results, "extracted_query": extracted_query, "intent": "unknown"}
+        elif provider == SearchProvider.TINYFISH:
+            results = await _search_tinyfish(extracted_query, max_results, full_content_results)
             return {"results": results, "extracted_query": extracted_query, "intent": "unknown"}
         else:
             # DuckDuckGo - now with hybrid search, optimization, and reranking
@@ -1102,3 +1106,145 @@ async def _search_serper(query: str, max_results: int = 10, full_content_results
     except Exception as e:
         logger.error(f"Serper search error: {e}")
         return "[System Note: Serper search failed. Please try again.]"
+
+
+async def _search_tinyfish(query: str, max_results: int = 8, full_content_results: int = 3) -> str:
+    """
+    Search using TinyFish Search API (async).
+    Optionally fetches full content via TinyFish Fetch API (batch) for top N results,
+    falling back to Jina Reader for any URLs that fail in the batch response.
+    Requires TINYFISH_API_KEY environment variable. Uses connection pooling.
+    """
+    start_time = time.time()
+    api_key = os.environ.get("TINYFISH_API_KEY")
+    if not api_key:
+        logger.error("TINYFISH_API_KEY not set")
+        return "[System Note: TinyFish API key not configured. Please add your TinyFish API key in settings.]"
+
+    try:
+        client = get_async_client()
+        response = await client.get(
+            "https://api.search.tinyfish.ai/",
+            params={
+                "query": query,
+                "location": "us",
+                "language": "en",
+            },
+            headers={
+                "X-API-Key": api_key,
+            },
+        )
+        response.raise_for_status()
+        data = response.json()
+
+        search_results_data = []
+        urls_to_fetch = []
+
+        # TinyFish always returns 10 results — slice to max_results
+        raw_results = data.get("results", [])[:max_results]
+
+        for i, result in enumerate(raw_results, 1):
+            title = result.get("title", "No Title")
+            url = result.get("url", "#")
+            snippet = result.get("snippet", "No description available.")
+
+            search_results_data.append({
+                'index': i,
+                'title': title,
+                'url': url,
+                'summary': snippet,
+                'content': None
+            })
+
+            # Queue top N results for full content fetch
+            if full_content_results > 0 and i <= full_content_results and url and url != '#':
+                urls_to_fetch.append((i - 1, url))
+
+        # Fetch full content via TinyFish Fetch API (batch) for top results
+        if urls_to_fetch:
+            elapsed = time.time() - start_time
+            remaining = SEARCH_TIMEOUT_BUDGET - elapsed
+
+            if remaining > 5:  # Need at least 5s to fetch content
+                batch_urls = [url for _, url in urls_to_fetch]
+                idx_map = {url: idx for idx, url in urls_to_fetch}
+
+                try:
+                    fetch_response = await client.post(
+                        "https://api.fetch.tinyfish.ai/",
+                        json={
+                            "urls": batch_urls,
+                            "format": "markdown",
+                        },
+                        headers={
+                            "X-API-Key": api_key,
+                        },
+                        timeout=min(remaining, 25.0),
+                    )
+                    fetch_response.raise_for_status()
+                    fetch_data = fetch_response.json()
+
+                    # Process successful fetches
+                    fetched_urls: Set[str] = set()
+                    for item in fetch_data.get("results", []):
+                        url = item.get("url", "")
+                        content = item.get("text", "")
+                        idx = idx_map.get(url)
+                        if idx is not None and content:
+                            fetched_urls.add(url)
+                            if len(content) < 500:
+                                original_summary = search_results_data[idx]['summary']
+                                content += f"\n\n[System Note: Full content fetch yielded limited text. Appending original summary.]\nOriginal Summary: {original_summary}"
+                            search_results_data[idx]['content'] = content
+
+                    # Fall back to Jina Reader for URLs that appeared in errors[]
+                    failed_urls = {err.get("url", "") for err in fetch_data.get("errors", [])}
+                    for url in failed_urls:
+                        idx = idx_map.get(url)
+                        if idx is None:
+                            continue
+                        elapsed = time.time() - start_time
+                        remaining = SEARCH_TIMEOUT_BUDGET - elapsed
+                        if remaining <= 5:
+                            logger.warning("Search timeout budget exhausted, skipping Jina fallback fetches")
+                            break
+                        logger.warning(f"TinyFish Fetch failed for {url}, falling back to Jina Reader")
+                        content = await _fetch_with_jina(url, timeout=min(remaining, 25.0))
+                        if content:
+                            if len(content) < 500:
+                                original_summary = search_results_data[idx]['summary']
+                                content += f"\n\n[System Note: Full content fetch yielded limited text. Appending original summary.]\nOriginal Summary: {original_summary}"
+                            search_results_data[idx]['content'] = content
+
+                except httpx.HTTPStatusError as e:
+                    logger.warning(f"TinyFish Fetch API error: {e.response.status_code} - {e.response.text}, skipping full content")
+                except Exception as e:
+                    logger.warning(f"TinyFish Fetch API error: {e}, skipping full content")
+            else:
+                logger.warning("Search timeout budget exhausted, skipping content fetches")
+
+        if not search_results_data:
+            return "No web search results found."
+
+        # Format results
+        formatted = []
+        for r in search_results_data:
+            text = f"Result {r['index']}:\nTitle: {r['title']}\nURL: {r['url']}"
+            if r['content']:
+                # Truncate content to ~2000 chars
+                content = r['content'][:2000]
+                if len(r['content']) > 2000:
+                    content += "..."
+                text += f"\nContent:\n{content}"
+            else:
+                text += f"\nSummary: {r['summary']}"
+            formatted.append(text)
+
+        return "\n\n".join(formatted)
+
+    except httpx.HTTPStatusError as e:
+        logger.error(f"TinyFish API error: {e.response.status_code} - {e.response.text}")
+        return "[System Note: TinyFish search failed. Please check your API key.]"
+    except Exception as e:
+        logger.error(f"TinyFish search error: {e}")
+        return "[System Note: TinyFish search failed. Please try again.]"
