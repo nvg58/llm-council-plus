@@ -3,6 +3,7 @@
 from mcp.server.fastmcp import FastMCP
 
 from .tools import council as council_tools
+from .tools import deliberation as deliberation_tools
 
 
 def create_server(
@@ -36,6 +37,7 @@ def create_server(
 
     # Register tools
     council_tools.register(server, base_url)
+    deliberation_tools.register(server, base_url)
 
     return server
 
