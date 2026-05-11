@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`POST /api/conversations/{id}/message` sync endpoint**: Non-streaming JSON alternative to SSE. Saves to conversation history without requiring event stream parsing.
 - **Per-request model overrides**: `council_models` and `chairman_model` fields on both streaming and sync message endpoints. Never mutates global config for ad-hoc queries.
 - **`PipelineResult` dataclass**: Shared orchestration helper (`_run_council_pipeline`) eliminates duplicated stage1/2/3 collection logic across sync endpoints.
+- **Multi-turn conversation memory**: Conversation endpoints pass full prior chat history to models. Follow-up questions carry context automatically.
+- **MCP `chat` tool**: Multi-turn equivalent of `quick_chat` — pass `conversation_id` to continue a conversation with memory. (14 tools total)
+- **UI: single-model council support**: Council members can now be reduced to 1 in the Settings UI (was minimum 2).
+- **UI: chairman auto-disables**: Chairman section dims and becomes non-interactive when execution mode is not "Full Deliberation".
 
 ### Changed
 - **Minimum council models reduced to 1**: Single-model queries are now valid for any execution mode (was 2 minimum).
@@ -26,7 +30,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **MCP `run_deliberation` uses per-request overrides**: Passes `council_models` in stream body instead of mutating settings with try/finally restore.
 - **MCP client `ask()` method added**: `CouncilClient.ask()` wraps `POST /api/ask` for one-shot queries.
 - **MCP client `stream_message` accepts overrides**: `council_models` and `chairman_model` params added to avoid settings mutation.
-- **`llm-council-api` skill updated to v0.4.1**: Documents `/api/ask`, per-request overrides, sync endpoint, SSE event table, and "Choosing the Right Endpoint" decision matrix.
+- **`llm-council-api` skill updated to v0.4.1**: Documents `/api/ask`, per-request overrides, sync endpoint, multi-turn conversations, SSE event table, and "Choosing the Right Endpoint" decision matrix.
+- **`DEFAULT_EXECUTION_MODE` constant**: Extracted shared default (`'full'`) to `api.js` — eliminates magic string duplication across `App.jsx`, `Settings.jsx`, `CouncilConfig.jsx`.
+- **`.subsection--disabled` CSS class**: Replaces inline opacity/pointer-events with reusable class (consistent with `.source-disabled`).
+- **Chairman `SearchableModelSelect` respects disabled state**: `isDisabled` prop wired so keyboard users cannot change chairman when irrelevant.
 
 ## [0.4.0] - 2026-05-10
 
