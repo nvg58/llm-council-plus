@@ -199,6 +199,9 @@ def register(server, base_url: str) -> None:
         "Irreversible — export first if you want to keep current settings."
     ))
     async def reset_config() -> str:
-        async with CouncilClient(base_url) as client:
-            await client.reset_settings()
+        try:
+            async with CouncilClient(base_url) as client:
+                await client.reset_settings()
+        except Exception as e:
+            return f"Error: reset failed — {e}"
         return "Configuration reset to defaults."

@@ -475,7 +475,7 @@ async def get_default_settings():
 async def export_settings():
     """Export complete settings as a downloadable JSON file (includes actual API key values)."""
     settings = get_settings()
-    content = json.dumps(settings.model_dump(mode="json"), indent=2)
+    content = settings.model_dump_json(indent=2)
     return Response(
         content=content,
         media_type="application/json",
@@ -484,16 +484,8 @@ async def export_settings():
 
 
 @app.post("/api/settings/import")
-async def import_settings(request: Request):
+async def import_settings(new_settings: Settings):
     """Import settings from a full settings JSON blob."""
-    try:
-        data = await request.json()
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid JSON body")
-    try:
-        new_settings = Settings(**data)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid settings: {e}")
     save_settings(new_settings)
     return {"status": "imported", "message": "Settings imported successfully"}
 

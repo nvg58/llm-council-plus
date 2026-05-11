@@ -11,7 +11,6 @@ from fastapi.testclient import TestClient
 
 
 def _make_default_settings():
-    """Return a fresh Settings instance (calls backend.settings.Settings())."""
     from backend.settings import Settings
     return Settings()
 
@@ -88,22 +87,21 @@ def test_import_valid_settings(client):
 
 
 def test_import_invalid_json(client):
-    """POST /api/settings/import with non-JSON body returns 400."""
+    """POST /api/settings/import with non-JSON body returns 422."""
     response = client.post(
         "/api/settings/import",
         content=b"this is not json",
         headers={"Content-Type": "application/json"},
     )
-    assert response.status_code == 400
+    assert response.status_code == 422
 
 
 def test_import_invalid_settings(client):
-    """POST /api/settings/import with a field of the wrong type returns 400."""
+    """POST /api/settings/import with a field of the wrong type returns 422."""
     # council_temperature must be a float; passing a string should fail validation.
     bad_payload = {"council_temperature": "not-a-number"}
     response = client.post("/api/settings/import", json=bad_payload)
-    assert response.status_code == 400
-    assert "Invalid settings" in response.json()["detail"]
+    assert response.status_code == 422
 
 
 # ---------------------------------------------------------------------------
