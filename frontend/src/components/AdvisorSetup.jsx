@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api';
+import SearchableModelSelect from './SearchableModelSelect';
 import './AdvisorSetup.css';
 
 const RECOMMENDED_PERSONA_IDS = ['skeptic', 'pragmatist', 'innovator'];
@@ -209,23 +210,17 @@ export default function AdvisorSetup({
 
         {modelMode === 'simple' ? (
           <div className="advisor-setup__model-simple">
-            <label className="advisor-setup__model-label" htmlFor="advisor-model-select">
+            <label className="advisor-setup__model-label">
               All advisors use the same model
             </label>
-            <select
-              id="advisor-model-select"
-              className="advisor-setup__model-select"
+            <SearchableModelSelect
+              models={models}
               value={chosenModel}
-              onChange={(e) => setChosenModel(e.target.value)}
-              disabled={modelsLoading}
-            >
-              <option value="">{modelsLoading ? 'Loading models…' : `Select a model (${models.length} available)…`}</option>
-              {models.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name}
-                </option>
-              ))}
-            </select>
+              onChange={(id) => setChosenModel(id)}
+              placeholder={modelsLoading ? 'Loading models…' : `Search ${models.length} models…`}
+              isLoading={modelsLoading}
+              isDisabled={modelsLoading}
+            />
           </div>
         ) : (
           <div className="advisor-setup__model-advanced">
@@ -243,19 +238,14 @@ export default function AdvisorSetup({
                       <span>{persona.avatar_emoji}</span>
                       <span>{persona.name}</span>
                     </span>
-                    <select
-                      className="advisor-setup__model-select"
+                    <SearchableModelSelect
+                      models={models}
                       value={modelAssignments[id] || ''}
-                      onChange={(e) => handleModelAssignment(id, e.target.value)}
-                      disabled={modelsLoading}
-                    >
-                      <option value="">{modelsLoading ? 'Loading…' : 'Select a model…'}</option>
-                      {models.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.name}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(modelId) => handleModelAssignment(id, modelId)}
+                      placeholder={modelsLoading ? 'Loading…' : 'Search models…'}
+                      isLoading={modelsLoading}
+                      isDisabled={modelsLoading}
+                    />
                   </div>
                 );
               })
