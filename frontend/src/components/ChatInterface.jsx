@@ -26,9 +26,6 @@ export default function ChatInterface({
     searchProvider = 'duckduckgo',
     mode = 'council',
     onStartDebate,
-    availableModels = [],
-    advisorDefaultModel = '',
-    advisorDefaultRounds = 2,
 }) {
     const [input, setInput] = useState('');
     const [webSearch, setWebSearch] = useState(false);
@@ -76,11 +73,8 @@ export default function ChatInterface({
                 <div className="chat-interface advisor-mode">
                     <div className="advisor-setup-scroll">
                         <AdvisorSetup
-                            availableModels={availableModels}
                             onStartDebate={onStartDebate}
                             isLoading={isLoading}
-                            defaultModel={advisorDefaultModel}
-                            defaultRounds={advisorDefaultRounds}
                         />
                     </div>
                 </div>
@@ -108,11 +102,8 @@ export default function ChatInterface({
                 {mode === 'advisors' && (!conversation || conversation.messages.length === 0) ? (
                     <div className="hero-container">
                         <AdvisorSetup
-                            availableModels={availableModels}
                             onStartDebate={onStartDebate}
                             isLoading={isLoading}
-                            defaultModel={advisorDefaultModel}
-                            defaultRounds={advisorDefaultRounds}
                         />
                     </div>
                 ) : (!conversation || conversation.messages.length === 0) ? (

@@ -5,35 +5,81 @@ import './AdvisorSetup.css';
 const RECOMMENDED_PERSONA_IDS = ['skeptic', 'pragmatist', 'innovator'];
 
 export default function AdvisorSetup({
-  availableModels = [],
   onStartDebate,
   isLoading = false,
-  defaultModel = '',
-  defaultRounds = 2,
 }) {
   const [personas, setPersonas] = useState([]);
   const [personasLoading, setPersonasLoading] = useState(true);
+  const [models, setModels] = useState([]);
+  const [modelsLoading, setModelsLoading] = useState(true);
   const [selectedPersonaIds, setSelectedPersonaIds] = useState([]);
   const [modelMode, setModelMode] = useState('simple');
-  const [chosenModel, setChosenModel] = useState(defaultModel || '');
+  const [chosenModel, setChosenModel] = useState('');
   const [modelAssignments, setModelAssignments] = useState({});
-  const [rounds, setRounds] = useState(defaultRounds || 2);
+  const [rounds, setRounds] = useState(2);
   const [webSearch, setWebSearch] = useState(false);
   const [question, setQuestion] = useState('');
 
+  // Fetch personas and all configured models on mount in parallel
   useEffect(() => {
     api.getPersonas()
       .then(setPersonas)
       .catch(() => setPersonas([]))
       .finally(() => setPersonasLoading(false));
-  }, []);
 
-  // Sync chosenModel if defaultModel prop changes and nothing selected yet
-  useEffect(() => {
-    if (defaultModel && !chosenModel) {
-      setChosenModel(defaultModel);
-    }
-  }, [defaultModel]);
+    const fetchModels = async () => {
+      try {
+        const settings = await api.getSettings();
+        const enabled = settings.enabled_providers || {};
+        const ollamaUrl = settings.ollama_base_url || 'http://localhost:11434';
+
+        const [orModels, ollamaModels, directModels, customModels] = await Promise.all([
+          enabled.openrouter
+            ? api.getModels().then(d => d.models || []).catch(() => [])
+            : [],
+          enabled.ollama
+            ? api.getOllamaModels(ollamaUrl).then(d => (d.models || []).map(m => ({
+                ...m,
+                id: m.id.startsWith('ollama:') ? m.id : `ollama:${m.id}`,
+                name: `${m.name || m.id} (Local)`,
+                provider: 'Ollama',
+              }))).catch(() => [])
+            : [],
+          (enabled.groq || enabled.direct)
+            ? api.getDirectModels().then(d => Array.isArray(d) ? d : (d.models || [])).catch(() => [])
+            : [],
+          enabled.custom
+            ? api.getCustomEndpointModels().then(d => d.models || []).catch(() => [])
+            : [],
+        ]);
+
+        const combined = [...orModels, ...ollamaModels, ...directModels, ...customModels];
+        const unique = new Map();
+        combined.forEach(m => unique.set(m.id, m));
+        const sorted = Array.from(unique.values())
+          .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+        setModels(sorted);
+
+        // Pre-select advisor default model from settings
+        if (settings.advisor_default_model) {
+          setChosenModel(settings.advisor_default_model);
+        } else if (sorted.length > 0) {
+          setChosenModel(sorted[0].id);
+        }
+
+        if (settings.advisor_default_rounds) {
+          setRounds(settings.advisor_default_rounds);
+        }
+      } catch (err) {
+        console.error('Failed to load advisor models:', err);
+      } finally {
+        setModelsLoading(false);
+      }
+    };
+
+    fetchModels();
+  }, []);
 
   // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -49,9 +95,8 @@ export default function AdvisorSetup({
 
   const handleUseRecommended = () => {
     setSelectedPersonaIds(RECOMMENDED_PERSONA_IDS);
-    // Auto-select first configured model if nothing chosen
-    if (!chosenModel && availableModels.length > 0) {
-      setChosenModel(availableModels[0].id);
+    if (!chosenModel && models.length > 0) {
+      setChosenModel(models[0].id);
     }
   };
 
@@ -172,9 +217,10 @@ export default function AdvisorSetup({
               className="advisor-setup__model-select"
               value={chosenModel}
               onChange={(e) => setChosenModel(e.target.value)}
+              disabled={modelsLoading}
             >
-              <option value="">Select a model...</option>
-              {availableModels.map((m) => (
+              <option value="">{modelsLoading ? 'Loading models…' : `Select a model (${models.length} available)…`}</option>
+              {models.map((m) => (
                 <option key={m.id} value={m.id}>
                   {m.name}
                 </option>
@@ -201,9 +247,10 @@ export default function AdvisorSetup({
                       className="advisor-setup__model-select"
                       value={modelAssignments[id] || ''}
                       onChange={(e) => handleModelAssignment(id, e.target.value)}
+                      disabled={modelsLoading}
                     >
-                      <option value="">Select a model...</option>
-                      {availableModels.map((m) => (
+                      <option value="">{modelsLoading ? 'Loading…' : 'Select a model…'}</option>
+                      {models.map((m) => (
                         <option key={m.id} value={m.id}>
                           {m.name}
                         </option>
