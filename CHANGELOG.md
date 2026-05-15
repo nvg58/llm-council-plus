@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-05-15
+
+### Added
+- **AGENTS.md canonical agent guide**: Single source of truth for AI agents (Claude Code, Codex, Gemini CLI) working in this repository — replaces scattered instructions across CLAUDE.md and GEMINI.md
+- **Admin endpoint security** (PR #9): `/api/settings/export`, `/api/settings/import`, and `/api/settings/reset` now require `LLM_COUNCIL_ADMIN_TOKEN` when accessed by remote or proxied clients. Direct loopback clients are still allowed without a token. Thanks @jonathanzhan1975!
+
+### Changed
+- **Jina Reader fetch hardening** (PR #9): Stricter URL validation before fetching full article content via Jina Reader. Thanks @jonathanzhan1975!
+- **Docker entrypoint escaping** (PR #9): Config values injected into `config.js` are now properly escaped to prevent shell injection. Thanks @jonathanzhan1975!
+- **Docs reconciliation** (PR #10): CLAUDE.md slimmed to a pointer at AGENTS.md; stale GEMINI.md archived to `docs/archive/`. Thanks @jonathanzhan1975!
+- **Admin security variables documented**: `LLM_COUNCIL_ADMIN_TOKEN` usage added to AGENTS.md and `docs/DOCKER.md`
+- **Custom endpoint error messages improved**: Timeout and connection errors now display actionable messages (e.g., "Request timed out after 120s") instead of "Unknown error"
+
 ## [0.4.1] - 2026-05-10
 
 ### Added
