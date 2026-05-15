@@ -71,6 +71,21 @@ export default function ChatInterface({
     };
 
     if (!conversation) {
+        if (mode === 'advisors') {
+            return (
+                <div className="chat-interface advisor-mode">
+                    <div className="advisor-setup-scroll">
+                        <AdvisorSetup
+                            availableModels={availableModels}
+                            onStartDebate={onStartDebate}
+                            isLoading={isLoading}
+                            defaultModel={advisorDefaultModel}
+                            defaultRounds={advisorDefaultRounds}
+                        />
+                    </div>
+                </div>
+            );
+        }
         return (
             <div className="chat-interface">
                 <div className="empty-state">
@@ -78,12 +93,9 @@ export default function ChatInterface({
                     <p className="hero-message">
                         The Council is ready to deliberate. <button className="config-link" onClick={() => onOpenSettings('council')}>Configure it</button>
                     </p>
-
-                    {/* Council Preview Grid */}
                     <div className="welcome-grid-container">
                         <CouncilGrid models={councilModels} chairman={chairmanModel} status="idle" chairmanDisabled={executionMode !== 'full'} />
                     </div>
-
                 </div>
             </div>
         );

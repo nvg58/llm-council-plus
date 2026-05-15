@@ -124,8 +124,8 @@ export default function Sidebar({
               onClick={() => onSelectConversation(conv.id)}
             >
               <div className="conversation-title">
-                <span className="conv-mode-icon" title={conv.mode === 'advisors' ? 'Advisors' : 'Council'}>
-                  {conv.mode === 'advisors' ? '🧑‍💼' : '⚖️'}
+                <span className={`conv-mode-tag conv-mode-tag--${conv.mode === 'advisors' ? 'advisors' : 'council'}`}>
+                  {conv.mode === 'advisors' ? 'ADV' : 'CNC'}
                 </span>
                 {conv.title || 'New Conversation'}
               </div>
