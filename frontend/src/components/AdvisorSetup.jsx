@@ -133,6 +133,69 @@ export default function AdvisorSetup({
 
   return (
     <div className="advisor-setup">
+      {/* Question Textarea — top, primary input */}
+      <div className="advisor-setup__section">
+        <label className="advisor-setup__section-label" htmlFor="advisor-question">
+          Debate Question
+        </label>
+        <textarea
+          id="advisor-question"
+          className="advisor-setup__question"
+          placeholder="What should your advisors debate?"
+          rows={4}
+          value={question}
+          onChange={(e) => setQuestion(e.target.value)}
+        />
+      </div>
+
+      {/* Rounds + Web Search — compact config directly below question */}
+      <div className="advisor-setup__section">
+        <div className="advisor-setup__config-row">
+          <div className="advisor-setup__rounds">
+            <span className="advisor-setup__config-label">Rounds</span>
+            <div className="advisor-setup__stepper">
+              <button
+                type="button"
+                className="advisor-setup__stepper-btn"
+                onClick={() => handleRoundsStep(-1)}
+                disabled={rounds <= 1}
+                aria-label="Decrease rounds"
+              >
+                −
+              </button>
+              <span className="advisor-setup__stepper-value">{rounds}</span>
+              <button
+                type="button"
+                className="advisor-setup__stepper-btn"
+                onClick={() => handleRoundsStep(1)}
+                disabled={rounds >= 10}
+                aria-label="Increase rounds"
+              >
+                +
+              </button>
+            </div>
+          </div>
+
+          <label className="advisor-setup__websearch-toggle">
+            <span className="advisor-setup__config-label">
+              <span aria-hidden="true">🌐</span> Web Search
+            </span>
+            <div
+              className={`advisor-setup__toggle ${webSearch ? 'advisor-setup__toggle--on' : ''}`}
+              onClick={() => setWebSearch((prev) => !prev)}
+              role="switch"
+              aria-checked={webSearch}
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === ' ' || e.key === 'Enter') setWebSearch((prev) => !prev);
+              }}
+            >
+              <div className="advisor-setup__toggle-knob" />
+            </div>
+          </label>
+        </div>
+      </div>
+
       {/* Use Recommended Button */}
       <div className="advisor-setup__recommended-row">
         <button
@@ -252,69 +315,6 @@ export default function AdvisorSetup({
             )}
           </div>
         )}
-      </div>
-
-      {/* Debate Config Row */}
-      <div className="advisor-setup__section">
-        <div className="advisor-setup__config-row">
-          <div className="advisor-setup__rounds">
-            <span className="advisor-setup__config-label">Rounds</span>
-            <div className="advisor-setup__stepper">
-              <button
-                type="button"
-                className="advisor-setup__stepper-btn"
-                onClick={() => handleRoundsStep(-1)}
-                disabled={rounds <= 1}
-                aria-label="Decrease rounds"
-              >
-                −
-              </button>
-              <span className="advisor-setup__stepper-value">{rounds}</span>
-              <button
-                type="button"
-                className="advisor-setup__stepper-btn"
-                onClick={() => handleRoundsStep(1)}
-                disabled={rounds >= 10}
-                aria-label="Increase rounds"
-              >
-                +
-              </button>
-            </div>
-          </div>
-
-          <label className="advisor-setup__websearch-toggle">
-            <span className="advisor-setup__config-label">
-              <span aria-hidden="true">🌐</span> Web Search
-            </span>
-            <div
-              className={`advisor-setup__toggle ${webSearch ? 'advisor-setup__toggle--on' : ''}`}
-              onClick={() => setWebSearch((prev) => !prev)}
-              role="switch"
-              aria-checked={webSearch}
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === ' ' || e.key === 'Enter') setWebSearch((prev) => !prev);
-              }}
-            >
-              <div className="advisor-setup__toggle-knob" />
-            </div>
-          </label>
-        </div>
-      </div>
-
-      {/* Question Textarea */}
-      <div className="advisor-setup__section">
-        <label className="advisor-setup__section-label" htmlFor="advisor-question">
-          Debate Question
-        </label>
-        <textarea
-          id="advisor-question"
-          className="advisor-setup__question"
-          placeholder="What should your advisors debate?"
-          rows={4}
-          value={question}
-          onChange={(e) => setQuestion(e.target.value)}
-        />
       </div>
 
       {/* Start Button */}
