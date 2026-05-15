@@ -2,6 +2,56 @@
 
 This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
+---
+> ⚠️ **TEMPORARY DEV NOTES — DELETE BEFORE MERGE TO MAIN** ⚠️
+
+## Active Branch: `worktree-feature+advisors`
+
+This branch adds the **LLM Advisors** mode — a second experience alongside LLM Council. Work is in progress. Do not merge to `main` until Jacob approves.
+
+### Local Dev Startup (IMPORTANT)
+
+The backend MUST be started with `FRONTEND_HOST` set, otherwise CORS blocks all requests from the Vite dev server (`localhost:5173`). Running `npm run build` creates a `frontend/dist/` folder which suppresses the automatic dev-port CORS regex in `main.py`.
+
+```bash
+# Backend (from worktree root):
+cd /path/to/.claude/worktrees/feature+advisors
+FRONTEND_HOST=http://localhost:5173 LLM_COUNCIL_BIND_HOST=0.0.0.0 uv run python -m backend.main
+
+# Frontend (separate terminal):
+cd frontend && npm run dev -- --host
+```
+
+Frontend dev server: `http://localhost:5173`  
+Backend API: `http://localhost:8001`
+
+### What's Built So Far
+
+- `backend/personas.py` — 10 built-in advisor personas (Skeptic, Pragmatist, Innovator, etc.)
+- `backend/advisor_prompts.py` — debate round prompts with inline CONSENSUS tag
+- `backend/advisors.py` — full debate orchestrator (`run_debate()` async generator)
+- `backend/main.py` — `/api/personas` + `/api/conversations/{id}/debate/stream` SSE endpoint
+- `backend/settings.py` — advisor settings fields (`advisor_default_model`, `advisor_tiebreaker_model`, `advisor_temperature`, `advisor_default_rounds`)
+- `backend/storage.py` — `mode` field on conversations, `add_advisor_message()`
+- `frontend/src/components/LandingPage.jsx` + `.css` — mode selection home screen
+- `frontend/src/components/AdvisorSetup.jsx` + `.css` — persona picker, model selector (self-fetches all configured providers)
+- `frontend/src/components/AdvisorGrid.jsx` + `.css` — advisor avatar strip with status
+- `frontend/src/components/DebateView.jsx` + `.css` — live debate timeline + verdict accordion
+- `frontend/src/App.jsx` — `appMode` state, `handleStartDebate()`, `onGoHome()` with abort
+- `frontend/src/components/Sidebar.jsx` — mode tags (CNC/ADV), Home button
+- `frontend/src/components/ChatInterface.jsx` — advisor mode routing (early return fix)
+
+### Known Remaining Work
+
+- End-to-end debate test (needs advisor model configured in Settings)
+- AdvisorSettings tab in Settings panel (Phase 6 — not started)
+- Conversation history reload when switching from Advisors back to landing
+- Mobile layout polish for AdvisorSetup persona gallery
+- Merge to `main` only after Jacob signs off
+
+> ⚠️ **END TEMPORARY DEV NOTES** ⚠️
+---
+
 ## Project Overview
 
 LLM Council Plus is a 3-stage deliberation system where multiple LLMs collaboratively answer user questions through:
