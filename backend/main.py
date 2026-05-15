@@ -17,6 +17,8 @@ from . import storage
 from .council import generate_conversation_title, generate_search_query, stage1_collect_responses, stage2_collect_rankings, stage3_synthesize_final, calculate_aggregate_rankings, PROVIDERS
 from .search import perform_web_search, SearchProvider
 from .settings import get_settings, save_settings, update_settings, Settings, DEFAULT_COUNCIL_MODELS, DEFAULT_CHAIRMAN_MODEL, AVAILABLE_MODELS
+from .personas import get_all_personas
+from .advisors import run_debate
 
 logger = logging.getLogger(__name__)
 
@@ -115,7 +117,17 @@ app.add_middleware(
 
 class CreateConversationRequest(BaseModel):
     """Request to create a new conversation."""
-    pass
+    mode: str = "council"
+
+
+class StartDebateRequest(BaseModel):
+    """Request to start an advisor debate."""
+    question: str
+    persona_ids: List[str]
+    model_assignments: Optional[Dict[str, str]] = None
+    default_model: Optional[str] = None
+    max_rounds: int = 2
+    web_search: bool = False
 
 
 ExecutionMode = Literal["chat_only", "chat_ranking", "full"]
@@ -251,6 +263,7 @@ class ConversationMetadata(BaseModel):
     id: str
     created_at: str
     title: str
+    mode: str = "council"
     message_count: int
 
 
@@ -259,6 +272,7 @@ class Conversation(BaseModel):
     id: str
     created_at: str
     title: str
+    mode: str = "council"
     messages: List[Dict[str, Any]]
 
 
@@ -290,7 +304,7 @@ async def list_conversations():
 async def create_conversation(request: CreateConversationRequest):
     """Create a new conversation."""
     conversation_id = str(uuid.uuid4())
-    conversation = storage.create_conversation(conversation_id)
+    conversation = storage.create_conversation(conversation_id, mode=request.mode)
     return conversation
 
 
@@ -503,6 +517,109 @@ async def send_message_stream(conversation_id: str, body: SendMessageRequest, re
     )
 
 
+@app.get("/api/personas")
+async def list_personas():
+    """List all available advisor personas."""
+    return [p.model_dump() for p in get_all_personas()]
+
+
+@app.post("/api/conversations/{conversation_id}/debate/stream")
+async def start_debate_stream(conversation_id: str, body: StartDebateRequest, request: Request):
+    """Start an advisor debate and stream results via SSE."""
+    conversation = storage.get_conversation(conversation_id)
+    if conversation is None:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    if len(body.persona_ids) < 2:
+        raise HTTPException(status_code=400, detail="At least 2 advisors required")
+    if len(body.persona_ids) > 4:
+        raise HTTPException(status_code=400, detail="Maximum 4 advisors allowed")
+    if body.max_rounds < 1 or body.max_rounds > 10:
+        raise HTTPException(status_code=400, detail="Rounds must be between 1 and 10")
+
+    is_first_message = len(conversation["messages"]) == 0
+
+    async def event_generator():
+        try:
+            storage.add_user_message(conversation_id, body.question, conversation=conversation)
+
+            search_context = ""
+            if body.web_search:
+                settings = get_settings()
+                yield f"data: {json.dumps({'type': 'advisor_search_start'})}\n\n"
+                search_context, search_query, _ = await _fetch_search_context(body.question, settings)
+                yield f"data: {json.dumps({'type': 'advisor_search_complete', 'data': {'search_query': search_query}})}\n\n"
+
+            all_rounds = []
+            verdict_data = None
+            tiebreaker_data = None
+
+            async for event in run_debate(
+                question=body.question,
+                persona_ids=body.persona_ids,
+                model_assignments=body.model_assignments,
+                default_model=body.default_model,
+                max_rounds=body.max_rounds,
+                web_search=body.web_search,
+                search_context=search_context,
+                request=request,
+            ):
+                event_type = event.get("type", "")
+
+                if event_type == "advisor_complete":
+                    all_rounds = event["data"]["rounds"]
+                    verdict_data = event["data"]["verdict"]
+                    tiebreaker_data = event["data"].get("tiebreaker")
+
+                yield f"data: {json.dumps(event)}\n\n"
+
+            metadata = {
+                "persona_ids": body.persona_ids,
+                "default_model": body.default_model,
+                "model_assignments": body.model_assignments,
+                "max_rounds": body.max_rounds,
+                "web_search": body.web_search,
+            }
+            if search_context:
+                metadata["search_context"] = search_context
+
+            storage.add_advisor_message(
+                conversation_id,
+                rounds=all_rounds,
+                verdict=verdict_data,
+                tiebreaker=tiebreaker_data,
+                metadata=metadata,
+                conversation=conversation,
+            )
+
+            if is_first_message:
+                title = await generate_conversation_title(body.question)
+                storage.update_conversation_title(conversation_id, title)
+                yield f"data: {json.dumps({'type': 'title_complete', 'data': {'title': title}})}\n\n"
+
+        except asyncio.CancelledError:
+            if is_first_message:
+                try:
+                    title = await generate_conversation_title(body.question)
+                    storage.update_conversation_title(conversation_id, title)
+                except Exception:
+                    pass
+            raise
+        except Exception as e:
+            logger.error(f"Debate stream error: {e}")
+            storage.add_error_message(conversation_id, f"Debate error: {str(e)}")
+            yield f"data: {json.dumps({'type': 'advisor_error', 'message': str(e)})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        }
+    )
+
+
 @app.post("/api/conversations/{conversation_id}/message")
 async def send_message_sync(conversation_id: str, body: SendMessageRequest):
     """Send a message and return JSON response (non-streaming)."""
@@ -650,6 +767,12 @@ class UpdateSettingsRequest(BaseModel):
     stage2_prompt: Optional[str] = None
     stage3_prompt: Optional[str] = None
 
+    # Advisor Settings
+    advisor_default_model: Optional[str] = None
+    advisor_tiebreaker_model: Optional[str] = None
+    advisor_temperature: Optional[float] = None
+    advisor_default_rounds: Optional[int] = None
+
 
 
 class TestTavilyRequest(BaseModel):
@@ -708,6 +831,12 @@ async def get_app_settings():
         "stage1_prompt": settings.stage1_prompt,
         "stage2_prompt": settings.stage2_prompt,
         "stage3_prompt": settings.stage3_prompt,
+
+        # Advisor Settings
+        "advisor_default_model": settings.advisor_default_model,
+        "advisor_tiebreaker_model": settings.advisor_tiebreaker_model,
+        "advisor_temperature": settings.advisor_temperature,
+        "advisor_default_rounds": settings.advisor_default_rounds,
     }
 
 
@@ -898,6 +1027,15 @@ async def update_app_settings(request: UpdateSettingsRequest):
         _validate_execution_mode(request.execution_mode)
         updates["execution_mode"] = request.execution_mode
 
+    if request.advisor_default_model is not None:
+        updates["advisor_default_model"] = request.advisor_default_model
+    if request.advisor_tiebreaker_model is not None:
+        updates["advisor_tiebreaker_model"] = request.advisor_tiebreaker_model
+    if request.advisor_temperature is not None:
+        updates["advisor_temperature"] = request.advisor_temperature
+    if request.advisor_default_rounds is not None:
+        updates["advisor_default_rounds"] = max(1, min(10, request.advisor_default_rounds))
+
     if updates:
         settings = update_settings(**updates)
     else:
@@ -943,6 +1081,12 @@ async def update_app_settings(request: UpdateSettingsRequest):
         "stage1_prompt": settings.stage1_prompt,
         "stage2_prompt": settings.stage2_prompt,
         "stage3_prompt": settings.stage3_prompt,
+
+        # Advisor Settings
+        "advisor_default_model": settings.advisor_default_model,
+        "advisor_tiebreaker_model": settings.advisor_tiebreaker_model,
+        "advisor_temperature": settings.advisor_temperature,
+        "advisor_default_rounds": settings.advisor_default_rounds,
     }
 
 

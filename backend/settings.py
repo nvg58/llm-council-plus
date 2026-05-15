@@ -125,6 +125,12 @@ class Settings(BaseModel):
     # Execution Mode
     execution_mode: str = "full"  # Default execution mode: 'chat_only', 'chat_ranking', 'full'
 
+    # Advisor Settings
+    advisor_default_model: str = ""
+    advisor_tiebreaker_model: str = ""
+    advisor_temperature: float = 0.7
+    advisor_default_rounds: int = 2
+
 
 _settings_cache: Settings | None = None
 _settings_mtime: float = 0.0

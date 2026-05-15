@@ -34,13 +34,13 @@ export const api = {
   /**
    * Create a new conversation.
    */
-  async createConversation() {
+  async createConversation(options = {}) {
     const response = await fetch(`${API_BASE}/api/conversations`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({}),
+      body: JSON.stringify(options),
     });
     if (!response.ok) {
       throw new Error('Failed to create conversation');
@@ -316,6 +316,68 @@ export const api = {
       throw new Error('Failed to update settings');
     }
     return response.json();
+  },
+
+  async getPersonas() {
+    const response = await fetch(`${API_BASE}/api/personas`);
+    if (!response.ok) throw new Error('Failed to fetch personas');
+    return response.json();
+  },
+
+  async sendDebateStream(conversationId, options, onEvent, signal) {
+    const body = {
+      question: options.question,
+      persona_ids: options.personaIds,
+      model_assignments: options.modelAssignments || null,
+      default_model: options.defaultModel || null,
+      max_rounds: options.maxRounds || 2,
+      web_search: options.webSearch || false,
+    };
+
+    const response = await fetch(
+      `${API_BASE}/api/conversations/${conversationId}/debate/stream?_t=${Date.now()}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache',
+        },
+        body: JSON.stringify(body),
+        signal,
+        cache: 'no-store',
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error('Failed to start debate stream');
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6);
+            try {
+              const event = JSON.parse(data);
+              onEvent(event.type, event);
+            } catch (e) {
+              console.error('Failed to parse SSE event:', e);
+            }
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
   },
 
   /**

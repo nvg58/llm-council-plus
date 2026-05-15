@@ -7,6 +7,8 @@ import Stage2, { Stage2Skeleton } from './Stage2';
 import Stage3, { Stage3Skeleton } from './Stage3';
 import CouncilGrid from './CouncilGrid';
 import ExecutionModeToggle from './ExecutionModeToggle';
+import DebateView from './DebateView';
+import AdvisorSetup from './AdvisorSetup';
 import { api } from '../api';
 import './ChatInterface.css';
 
@@ -22,6 +24,11 @@ export default function ChatInterface({
     executionMode,
     onExecutionModeChange,
     searchProvider = 'duckduckgo',
+    mode = 'council',
+    onStartDebate,
+    availableModels = [],
+    advisorDefaultModel = '',
+    advisorDefaultRounds = 2,
 }) {
     const [input, setInput] = useState('');
     const [webSearch, setWebSearch] = useState(false);
@@ -86,7 +93,17 @@ export default function ChatInterface({
         <div className="chat-interface">
             {/* Messages Area */}
             <div className="messages-area" ref={messagesContainerRef}>
-                {(!conversation || conversation.messages.length === 0) ? (
+                {mode === 'advisors' && (!conversation || conversation.messages.length === 0) ? (
+                    <div className="hero-container">
+                        <AdvisorSetup
+                            availableModels={availableModels}
+                            onStartDebate={onStartDebate}
+                            isLoading={isLoading}
+                            defaultModel={advisorDefaultModel}
+                            defaultRounds={advisorDefaultRounds}
+                        />
+                    </div>
+                ) : (!conversation || conversation.messages.length === 0) ? (
                     <div className="hero-container">
                         <div className="hero-content">
                             <h1>Welcome to LLM Council <span className="text-gradient">Plus</span></h1>
@@ -110,6 +127,17 @@ export default function ChatInterface({
                                     <div className="markdown-content">
                                         <ReactMarkdown>{msg.content}</ReactMarkdown>
                                     </div>
+                                ) : (msg.mode === 'advisors' || msg.type === 'advisor_debate') ? (
+                                    <DebateView
+                                        personas={msg.personas || []}
+                                        rounds={msg.rounds || []}
+                                        verdict={msg.verdict || null}
+                                        tiebreaker={msg.tiebreaker || null}
+                                        currentRound={msg.currentRound || 0}
+                                        maxRounds={msg.maxRounds || msg.metadata?.max_rounds || 2}
+                                        isRunning={msg.isRunning || false}
+                                        question={msg.question || ''}
+                                    />
                                 ) : (
                                     <>
                                         {/* Search Loading */}

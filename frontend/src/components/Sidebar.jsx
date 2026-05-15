@@ -11,7 +11,8 @@ export default function Sidebar({
   isLoading,
   onAbort,
   isOpen,
-  onClose
+  onClose,
+  onGoHome,
 }) {
   const [confirmingDelete, setConfirmingDelete] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -70,15 +71,23 @@ export default function Sidebar({
         </button>
       </div>
 
-      {/* Prominent New Discussion Button */}
+      {/* Mode Actions */}
       <div className="sidebar-actions">
+        <button
+          className="new-council-btn home-btn"
+          onClick={onGoHome}
+          title="Choose mode"
+        >
+          <span className="btn-icon">⌂</span>
+          <span className="btn-text">Home</span>
+        </button>
         <button
           className="new-council-btn"
           onClick={onNewConversation}
           disabled={isLoading}
         >
           <span className="btn-icon">+</span>
-          <span className="btn-text">New Discussion</span>
+          <span className="btn-text">New</span>
         </button>
       </div>
 
@@ -115,6 +124,9 @@ export default function Sidebar({
               onClick={() => onSelectConversation(conv.id)}
             >
               <div className="conversation-title">
+                <span className="conv-mode-icon" title={conv.mode === 'advisors' ? 'Advisors' : 'Council'}>
+                  {conv.mode === 'advisors' ? '🧑‍💼' : '⚖️'}
+                </span>
                 {conv.title || 'New Conversation'}
               </div>
               <div className="conversation-meta">

@@ -2,9 +2,11 @@ import { useState, useEffect, useRef } from 'react';
 import Sidebar from './components/Sidebar';
 import ChatInterface from './components/ChatInterface';
 import Settings from './components/Settings';
+import LandingPage from './components/LandingPage';
 import { api, DEFAULT_EXECUTION_MODE } from './api';
 import './App.css';
 import './components/StageCopyButtons.css';
+import './ModeToggle.css';
 
 function App() {
   const [conversations, setConversations] = useState([]);
@@ -24,7 +26,10 @@ function App() {
   const [searchProvider, setSearchProvider] = useState('duckduckgo');
   const [executionMode, setExecutionMode] = useState(DEFAULT_EXECUTION_MODE);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [appMode, setAppMode] = useState(null); // null shows landing page
+  const [advisorState, setAdvisorState] = useState(null);
   const abortControllerRef = useRef(null);
+  const advisorAbortControllerRef = useRef(null);
   const requestIdRef = useRef(0);
   const isInitialMount = useRef(true);
 
@@ -230,6 +235,13 @@ function App() {
 
   const handleSelectConversation = (id) => {
     setCurrentConversationId(id);
+    // Auto-switch mode based on conversation mode
+    const conv = conversations.find(c => c.id === id);
+    if (conv?.mode === 'advisors') {
+      setAppMode('advisors');
+    } else {
+      setAppMode('council');
+    }
   };
 
   const handleDeleteConversation = async (id) => {
@@ -253,6 +265,196 @@ function App() {
       // Don't set to null here - let the request handler clean up
       // This prevents race conditions with rapid clicks
       setIsLoading(false);
+    }
+  };
+
+  const handleStartDebate = async (options) => {
+    try {
+      const newConv = await api.createConversation({ mode: 'advisors' });
+      const convId = newConv.id;
+
+      setConversations((prev) => [
+        { id: convId, created_at: newConv.created_at, message_count: 0 },
+        ...prev,
+      ]);
+      setCurrentConversationId(convId);
+
+      const userMessage = { role: 'user', content: options.question };
+      const debateMessage = {
+        role: 'assistant',
+        type: 'advisor_debate',
+        isRunning: true,
+        currentRound: 0,
+        maxRounds: options.maxRounds || 2,
+        personas: [],
+        rounds: [],
+        verdict: null,
+        tiebreaker: null,
+        consensusReached: false,
+        error: null,
+      };
+
+      setCurrentConversation({
+        id: convId,
+        messages: [userMessage, debateMessage],
+      });
+
+      setAdvisorState({ isRunning: true });
+      advisorAbortControllerRef.current = new AbortController();
+      setIsLoading(true);
+
+      await api.sendDebateStream(
+        convId,
+        options,
+        (eventType, event) => {
+          switch (eventType) {
+            case 'advisor_debate_start':
+              setCurrentConversation((prev) => {
+                const messages = [...prev.messages];
+                const lastMsg = messages[messages.length - 1];
+                messages[messages.length - 1] = {
+                  ...lastMsg,
+                  personas: event.personas || [],
+                  maxRounds: event.max_rounds || lastMsg.maxRounds,
+                };
+                return { ...prev, messages };
+              });
+              break;
+
+            case 'advisor_round_start':
+              setCurrentConversation((prev) => {
+                const messages = [...prev.messages];
+                const lastMsg = messages[messages.length - 1];
+                messages[messages.length - 1] = {
+                  ...lastMsg,
+                  currentRound: event.round || lastMsg.currentRound,
+                };
+                return { ...prev, messages };
+              });
+              break;
+
+            case 'advisor_response':
+              setCurrentConversation((prev) => {
+                const messages = [...prev.messages];
+                const lastMsg = messages[messages.length - 1];
+                const rounds = [...(lastMsg.rounds || [])];
+                const roundIndex = (event.round || 1) - 1;
+                if (!rounds[roundIndex]) {
+                  rounds[roundIndex] = { round: event.round, responses: [], complete: false };
+                }
+                rounds[roundIndex] = {
+                  ...rounds[roundIndex],
+                  responses: [...rounds[roundIndex].responses, event.data],
+                };
+                messages[messages.length - 1] = { ...lastMsg, rounds };
+                return { ...prev, messages };
+              });
+              break;
+
+            case 'advisor_round_complete':
+              setCurrentConversation((prev) => {
+                const messages = [...prev.messages];
+                const lastMsg = messages[messages.length - 1];
+                const rounds = [...(lastMsg.rounds || [])];
+                const roundIndex = (event.round || 1) - 1;
+                if (!rounds[roundIndex]) {
+                  rounds[roundIndex] = { round: event.round, responses: [], complete: false };
+                }
+                rounds[roundIndex] = {
+                  ...rounds[roundIndex],
+                  complete: true,
+                  consensusReached: event.consensus_reached || false,
+                };
+                messages[messages.length - 1] = {
+                  ...lastMsg,
+                  rounds,
+                  consensusReached: event.consensus_reached || false,
+                };
+                return { ...prev, messages };
+              });
+              break;
+
+            case 'advisor_verdict':
+              setCurrentConversation((prev) => {
+                const messages = [...prev.messages];
+                const lastMsg = messages[messages.length - 1];
+                messages[messages.length - 1] = {
+                  ...lastMsg,
+                  verdict: event.data || event,
+                };
+                return { ...prev, messages };
+              });
+              break;
+
+            case 'advisor_tiebreaker':
+              setCurrentConversation((prev) => {
+                const messages = [...prev.messages];
+                const lastMsg = messages[messages.length - 1];
+                messages[messages.length - 1] = {
+                  ...lastMsg,
+                  tiebreaker: event.data || event,
+                };
+                return { ...prev, messages };
+              });
+              break;
+
+            case 'advisor_complete':
+              setCurrentConversation((prev) => {
+                const messages = [...prev.messages];
+                const lastMsg = messages[messages.length - 1];
+                messages[messages.length - 1] = { ...lastMsg, isRunning: false };
+                return { ...prev, messages };
+              });
+              setAdvisorState({ isRunning: false });
+              setIsLoading(false);
+              break;
+
+            case 'advisor_error':
+              setCurrentConversation((prev) => {
+                const messages = [...prev.messages];
+                const lastMsg = messages[messages.length - 1];
+                messages[messages.length - 1] = {
+                  ...lastMsg,
+                  isRunning: false,
+                  error: event.message || 'Advisor debate failed',
+                };
+                return { ...prev, messages };
+              });
+              setAdvisorState({ isRunning: false });
+              setIsLoading(false);
+              break;
+
+            case 'title_complete':
+              loadConversations();
+              break;
+
+            default:
+              break;
+          }
+        },
+        advisorAbortControllerRef.current.signal
+      );
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        setCurrentConversation((prev) => {
+          if (!prev || prev.messages.length < 2) return prev;
+          const messages = [...prev.messages];
+          const lastMsg = messages[messages.length - 1];
+          if (lastMsg.type === 'advisor_debate') {
+            messages[messages.length - 1] = { ...lastMsg, isRunning: false, aborted: true };
+          }
+          return { ...prev, messages };
+        });
+        setAdvisorState({ isRunning: false });
+        setIsLoading(false);
+        return;
+      }
+      console.error('Failed to start debate:', error);
+      setAdvisorState({ isRunning: false, error: error.message });
+      setIsLoading(false);
+    } finally {
+      advisorAbortControllerRef.current = null;
+      loadConversations();
     }
   };
 
@@ -686,8 +888,8 @@ function App() {
   return (
     <div className="app">
       {/* Mobile hamburger menu button */}
-      <button 
-        className="mobile-menu-btn" 
+      <button
+        className="mobile-menu-btn"
         onClick={() => setSidebarOpen(true)}
         aria-label="Open menu"
       >
@@ -705,20 +907,31 @@ function App() {
         onAbort={handleAbort}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
+        onGoHome={() => { setAppMode(null); setCurrentConversationId(null); setCurrentConversation(null); setSidebarOpen(false); }}
       />
-      <ChatInterface
-        conversation={currentConversation}
-        onSendMessage={handleSendMessage}
-        onAbort={handleAbort}
-        isLoading={isLoading}
-        councilConfigured={councilConfigured}
-        councilModels={councilModels}
-        chairmanModel={chairmanModel}
-        searchProvider={searchProvider}
-        onOpenSettings={handleOpenSettings}
-        executionMode={executionMode}
-        onExecutionModeChange={setExecutionMode}
-      />
+
+      <div className="main-area">
+        {appMode === null && !currentConversationId ? (
+          <LandingPage onSelectMode={(m) => setAppMode(m)} />
+        ) : (
+          <ChatInterface
+            conversation={currentConversation}
+            onSendMessage={handleSendMessage}
+            onAbort={handleAbort}
+            isLoading={isLoading}
+            councilConfigured={councilConfigured}
+            councilModels={councilModels}
+            chairmanModel={chairmanModel}
+            searchProvider={searchProvider}
+            onOpenSettings={handleOpenSettings}
+            executionMode={executionMode}
+            onExecutionModeChange={setExecutionMode}
+            mode={appMode || 'council'}
+            onStartDebate={handleStartDebate}
+          />
+        )}
+      </div>
+
       {showSettings && (
         <Settings
           onClose={handleSettingsClose}
