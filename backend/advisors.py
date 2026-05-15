@@ -6,7 +6,7 @@ import re
 from typing import List, Dict, Any, Optional
 
 from .council import query_model
-from .personas import get_persona, get_personas_by_ids, Persona
+from .personas import get_personas_by_ids, Persona
 from .settings import get_settings
 from .advisor_prompts import (
     ADVISOR_ROUND1_PROMPT,
@@ -65,6 +65,29 @@ def _resolve_model(
     if model_assignments and persona_id in model_assignments:
         return model_assignments[persona_id]
     return default_model
+
+
+async def _query_advisor(
+    pid: str,
+    prompt: str,
+    personas_map: Dict[str, Persona],
+    model_assignments: Optional[Dict[str, str]],
+    default_model: str,
+    temperature: float,
+) -> tuple:
+    persona = personas_map[pid]
+    model = _resolve_model(pid, model_assignments, default_model)
+    messages = [
+        {"role": "system", "content": persona.system_prompt},
+        {"role": "user", "content": prompt},
+    ]
+    try:
+        result = await query_model(model, messages, temperature=temperature)
+        if result.get("error"):
+            return pid, model, None, result.get("error_message", "Model error")
+        return pid, model, result.get("content", ""), None
+    except Exception as e:
+        return pid, model, None, str(e)
 
 
 async def run_debate(
@@ -161,22 +184,9 @@ async def run_debate(
                 consensus_tag=CONSENSUS_TAG_INSTRUCTION,
             )
 
-        async def _query_advisor(pid: str, prompt: str):
-            persona = personas_map[pid]
-            model = _resolve_model(pid, model_assignments, default_model)
-            messages = [
-                {"role": "system", "content": persona.system_prompt},
-                {"role": "user", "content": prompt},
-            ]
-            try:
-                result = await query_model(model, messages, temperature=temperature)
-                if result.get("error"):
-                    return pid, model, None, result.get("error_message", "Model error")
-                return pid, model, result.get("content", ""), None
-            except Exception as e:
-                return pid, model, None, str(e)
-
-        tasks = [asyncio.create_task(_query_advisor(pid, prompt_template)) for pid in order]
+        tasks = [asyncio.create_task(_query_advisor(
+            pid, prompt_template, personas_map, model_assignments, default_model, temperature
+        )) for pid in order]
 
         pending = set(tasks)
         completed_count = 0
@@ -244,9 +254,8 @@ async def run_debate(
         })
 
         all_agree = (
-            len(consensus_votes) >= 2
+            len(consensus_votes) == len(successful_responses)
             and all(consensus_votes.values())
-            and len(consensus_votes) == len(successful_responses)
         )
 
         yield {
@@ -254,7 +263,7 @@ async def run_debate(
             "data": {
                 "round_number": round_num,
                 "responses": round_responses,
-                "consensus_votes": {k: v for k, v in consensus_votes.items()},
+                "consensus_votes": dict(consensus_votes),
                 "consensus_reached": all_agree,
             },
         }

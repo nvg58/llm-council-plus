@@ -424,10 +424,6 @@ function App() {
               setIsLoading(false);
               break;
 
-            case 'title_complete':
-              loadConversations();
-              break;
-
             default:
               break;
           }
@@ -907,7 +903,15 @@ function App() {
         onAbort={handleAbort}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
-        onGoHome={() => { setAppMode(null); setCurrentConversationId(null); setCurrentConversation(null); setSidebarOpen(false); }}
+        onGoHome={() => {
+          if (advisorAbortControllerRef.current) advisorAbortControllerRef.current.abort();
+          if (abortControllerRef.current) abortControllerRef.current.abort();
+          setIsLoading(false);
+          setAppMode(null);
+          setCurrentConversationId(null);
+          setCurrentConversation(null);
+          setSidebarOpen(false);
+        }}
       />
 
       <div className="main-area">

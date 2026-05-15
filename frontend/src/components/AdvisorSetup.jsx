@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import * as apiModule from '../api';
+import { api } from '../api';
 import './AdvisorSetup.css';
-
-const api = apiModule.api || apiModule.default || apiModule;
 
 const RECOMMENDED_PERSONA_IDS = ['skeptic', 'pragmatist', 'innovator'];
 
@@ -23,27 +21,11 @@ export default function AdvisorSetup({
   const [webSearch, setWebSearch] = useState(false);
   const [question, setQuestion] = useState('');
 
-  // Fetch personas on mount
   useEffect(() => {
-    const fetchPersonas = async () => {
-      try {
-        const hostname = window.location.hostname;
-        const apiBase =
-          window.__LLM_COUNCIL_CONFIG__?.apiUrl ||
-          import.meta.env.VITE_API_URL ||
-          `http://${hostname}:8001`;
-        const res = await fetch(`${apiBase}/api/personas`);
-        if (!res.ok) throw new Error('Failed to fetch personas');
-        const data = await res.json();
-        setPersonas(data);
-      } catch (err) {
-        console.error('Error fetching personas:', err);
-        setPersonas([]);
-      } finally {
-        setPersonasLoading(false);
-      }
-    };
-    fetchPersonas();
+    api.getPersonas()
+      .then(setPersonas)
+      .catch(() => setPersonas([]))
+      .finally(() => setPersonasLoading(false));
   }, []);
 
   // Sync chosenModel if defaultModel prop changes and nothing selected yet
