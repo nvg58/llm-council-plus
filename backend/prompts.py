@@ -68,3 +68,10 @@ The title should be concise and descriptive. Do not use quotes or punctuation in
 Question: {user_query}
 
 Title:"""
+
+QUERY_PROMPT_DEFAULT = """Extract the core search terms from the following question to use in a web search engine.
+Return ONLY the search query, with no quotes, punctuation, or conversational text.
+
+Question: {user_query}
+
+Search Query:"""

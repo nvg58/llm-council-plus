@@ -64,6 +64,7 @@ def rebuild_index() -> List[Dict[str, Any]]:
                         "id": data["id"],
                         "created_at": data["created_at"],
                         "title": data.get("title", "New Conversation"),
+                        "mode": data.get("mode", "council"),
                         "message_count": len(data["messages"])
                     })
             except (json.JSONDecodeError, OSError):
@@ -87,6 +88,7 @@ def _update_index_entry(conversation: Dict[str, Any]):
         "id": conversation["id"],
         "created_at": conversation["created_at"],
         "title": conversation.get("title", "New Conversation"),
+        "mode": conversation.get("mode", "council"),
         "message_count": len(conversation["messages"])
     }
 
@@ -114,12 +116,13 @@ def _remove_from_index(conversation_id: str):
         _save_index(new_index)
 
 
-def create_conversation(conversation_id: str) -> Dict[str, Any]:
+def create_conversation(conversation_id: str, mode: str = "council") -> Dict[str, Any]:
     """
     Create a new conversation.
 
     Args:
         conversation_id: Unique identifier for the conversation
+        mode: Conversation mode — "council" or "advisors"
 
     Returns:
         New conversation dict
@@ -130,6 +133,7 @@ def create_conversation(conversation_id: str) -> Dict[str, Any]:
         "id": conversation_id,
         "created_at": datetime.utcnow().isoformat(),
         "title": "New Conversation",
+        "mode": mode,
         "messages": []
     }
 
@@ -258,6 +262,46 @@ def add_assistant_message(
 
     conversation["messages"].append(message)
 
+    save_conversation(conversation)
+
+
+def add_advisor_message(
+    conversation_id: str,
+    rounds: List[Dict[str, Any]],
+    verdict: Optional[Dict[str, Any]] = None,
+    tiebreaker: Optional[Dict[str, Any]] = None,
+    metadata: Optional[Dict[str, Any]] = None,
+    conversation: Optional[Dict[str, Any]] = None
+):
+    """Add an advisor debate message to a conversation.
+
+    Args:
+        conversation_id: Conversation identifier
+        rounds: List of round dicts, each with round_number and responses
+        verdict: Structured verdict (summary, consensus, disagreements, etc.)
+        tiebreaker: Tiebreaker result if vote was tied
+        metadata: Optional metadata (persona_ids, models, etc.)
+        conversation: Pre-loaded conversation dict (avoids redundant disk read)
+    """
+    if conversation is None:
+        conversation = get_conversation(conversation_id)
+    if conversation is None:
+        raise ValueError(f"Conversation {conversation_id} not found")
+
+    message = {
+        "role": "assistant",
+        "mode": "advisors",
+        "rounds": rounds,
+    }
+
+    if verdict is not None:
+        message["verdict"] = verdict
+    if tiebreaker is not None:
+        message["tiebreaker"] = tiebreaker
+    if metadata:
+        message["metadata"] = metadata
+
+    conversation["messages"].append(message)
     save_conversation(conversation)
 
 

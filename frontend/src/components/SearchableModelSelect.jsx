@@ -197,12 +197,10 @@ export default function SearchableModelSelect({
       loadingMessage={() => "Loading models..."}
       filterOption={(option, inputValue) => {
         if (!inputValue) return true;
-        const searchLower = inputValue.toLowerCase();
-        // Search in both label and value (model ID)
-        return (
-          option.label.toLowerCase().includes(searchLower) ||
-          option.value.toLowerCase().includes(searchLower)
-        );
+        // Normalize dashes/underscores to spaces so "kimi k2" matches "kimi-k2"
+        const normalize = (s) => s.toLowerCase().replace(/[-_]/g, ' ');
+        const q = normalize(inputValue);
+        return normalize(option.label).includes(q) || normalize(option.value).includes(q);
       }}
     />
   );

@@ -7,7 +7,8 @@ import Stage2, { Stage2Skeleton } from './Stage2';
 import Stage3, { Stage3Skeleton } from './Stage3';
 import CouncilGrid from './CouncilGrid';
 import ExecutionModeToggle from './ExecutionModeToggle';
-import { api } from '../api';
+import DebateView from './DebateView';
+import AdvisorSetup from './AdvisorSetup';
 import './ChatInterface.css';
 
 export default function ChatInterface({
@@ -22,9 +23,14 @@ export default function ChatInterface({
     executionMode,
     onExecutionModeChange,
     searchProvider = 'duckduckgo',
+    availableSearchProviders = [{ id: 'duckduckgo', name: 'DuckDuckGo' }],
+    mode = 'council',
+    onStartDebate,
 }) {
     const [input, setInput] = useState('');
-    const [webSearch, setWebSearch] = useState(false);
+    const [activeSearchProvider, setActiveSearchProvider] = useState(null);
+    const [searchPopoverOpen, setSearchPopoverOpen] = useState(false);
+    const searchPopoverRef = useRef(null);
     const messagesEndRef = useRef(null);
     const messagesContainerRef = useRef(null);
 
@@ -47,10 +53,20 @@ export default function ChatInterface({
         }
     }, [conversation]);
 
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (searchPopoverRef.current && !searchPopoverRef.current.contains(e.target)) {
+                setSearchPopoverOpen(false);
+            }
+        };
+        if (searchPopoverOpen) document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [searchPopoverOpen]);
+
     const handleSubmit = (e) => {
         e.preventDefault();
         if (input.trim() && !isLoading) {
-            onSendMessage(input, webSearch);
+            onSendMessage(input, activeSearchProvider);
             setInput('');
         }
     };
@@ -64,6 +80,18 @@ export default function ChatInterface({
     };
 
     if (!conversation) {
+        if (mode === 'advisors') {
+            return (
+                <div className="chat-interface advisor-mode">
+                    <div className="advisor-setup-scroll">
+                        <AdvisorSetup
+                            onStartDebate={onStartDebate}
+                            isLoading={isLoading}
+                        />
+                    </div>
+                </div>
+            );
+        }
         return (
             <div className="chat-interface">
                 <div className="empty-state">
@@ -71,12 +99,9 @@ export default function ChatInterface({
                     <p className="hero-message">
                         The Council is ready to deliberate. <button className="config-link" onClick={() => onOpenSettings('council')}>Configure it</button>
                     </p>
-
-                    {/* Council Preview Grid */}
                     <div className="welcome-grid-container">
                         <CouncilGrid models={councilModels} chairman={chairmanModel} status="idle" chairmanDisabled={executionMode !== 'full'} />
                     </div>
-
                 </div>
             </div>
         );
@@ -86,7 +111,14 @@ export default function ChatInterface({
         <div className="chat-interface">
             {/* Messages Area */}
             <div className="messages-area" ref={messagesContainerRef}>
-                {(!conversation || conversation.messages.length === 0) ? (
+                {mode === 'advisors' && (!conversation || conversation.messages.length === 0) ? (
+                    <div className="advisor-setup-scroll">
+                        <AdvisorSetup
+                            onStartDebate={onStartDebate}
+                            isLoading={isLoading}
+                        />
+                    </div>
+                ) : (!conversation || conversation.messages.length === 0) ? (
                     <div className="hero-container">
                         <div className="hero-content">
                             <h1>Welcome to LLM Council <span className="text-gradient">Plus</span></h1>
@@ -110,6 +142,17 @@ export default function ChatInterface({
                                     <div className="markdown-content">
                                         <ReactMarkdown>{msg.content}</ReactMarkdown>
                                     </div>
+                                ) : (msg.mode === 'advisors' || msg.type === 'advisor_debate') ? (
+                                    <DebateView
+                                        personas={msg.personas || []}
+                                        rounds={msg.rounds || []}
+                                        verdict={msg.verdict || null}
+                                        tiebreaker={msg.tiebreaker || null}
+                                        currentRound={msg.currentRound || 0}
+                                        maxRounds={msg.maxRounds || msg.metadata?.max_rounds || 2}
+                                        isRunning={msg.isRunning || false}
+                                        question={msg.question || ''}
+                                    />
                                 ) : (
                                     <>
                                         {/* Search Loading */}
@@ -117,12 +160,7 @@ export default function ChatInterface({
                                             <div className="stage-loading">
                                                 <div className="spinner"></div>
                                                 <span>
-                                                    🔍 Searching the web with {
-                                                        searchProvider === 'duckduckgo' ? 'DuckDuckGo' :
-                                                            searchProvider === 'tavily' ? 'Tavily' :
-                                                                searchProvider === 'brave' ? 'Brave' :
-                                                                    'Provider'
-                                                    }...
+                                                    🔍 Searching the web with {availableSearchProviders.find(p => p.id === (activeSearchProvider || searchProvider))?.name || 'Web'}...
                                                 </span>
                                             </div>
                                         )}
@@ -235,17 +273,47 @@ export default function ChatInterface({
                 ) : (
                     <form className="input-container" onSubmit={handleSubmit}>
                         <div className="input-row-top">
-                            <label className={`search-toggle ${webSearch ? 'active' : ''}`} title="Toggle Web Search">
-                                <input
-                                    type="checkbox"
-                                    className="search-checkbox"
-                                    checked={webSearch}
-                                    onChange={() => setWebSearch(!webSearch)}
+                            <div className="search-provider-picker" ref={searchPopoverRef}>
+                                <button
+                                    type="button"
+                                    className={`search-toggle ${activeSearchProvider ? 'active' : ''}`}
+                                    onClick={() => !isLoading && setSearchPopoverOpen((v) => !v)}
                                     disabled={isLoading}
-                                />
-                                <span className="search-icon">🌐</span>
-                                {webSearch && <span className="search-label">Search On</span>}
-                            </label>
+                                    title={activeSearchProvider ? `Search: ${availableSearchProviders.find(p => p.id === activeSearchProvider)?.name || activeSearchProvider}` : 'Web Search Off'}
+                                    aria-haspopup="listbox"
+                                    aria-expanded={searchPopoverOpen}
+                                >
+                                    <span className="search-icon">🌐</span>
+                                    {activeSearchProvider && (
+                                        <span className="search-label">
+                                            {availableSearchProviders.find(p => p.id === activeSearchProvider)?.name || activeSearchProvider}
+                                        </span>
+                                    )}
+                                </button>
+                                {searchPopoverOpen && (
+                                    <div className="search-popover" role="listbox">
+                                        <button
+                                            type="button"
+                                            className={`search-popover-option ${!activeSearchProvider ? 'search-popover-option--selected' : ''}`}
+                                            onClick={() => { setActiveSearchProvider(null); setSearchPopoverOpen(false); }}
+                                        >
+                                            <span className="search-popover-option-icon">✕</span>
+                                            Off
+                                        </button>
+                                        {availableSearchProviders.map((p) => (
+                                            <button
+                                                key={p.id}
+                                                type="button"
+                                                className={`search-popover-option ${activeSearchProvider === p.id ? 'search-popover-option--selected' : ''}`}
+                                                onClick={() => { setActiveSearchProvider(p.id); setSearchPopoverOpen(false); }}
+                                            >
+                                                <span className="search-popover-option-icon">🌐</span>
+                                                {p.name}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
 
                             <textarea
                                 className="message-input"

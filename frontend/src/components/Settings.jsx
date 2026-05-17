@@ -52,7 +52,8 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
     anthropic_api_key: '',
     google_api_key: '',
     mistral_api_key: '',
-    deepseek_api_key: ''
+    deepseek_api_key: '',
+    nvidia_api_key: '',
   });
   const [directAvailableModels, setDirectAvailableModels] = useState([]);
 
@@ -90,7 +91,8 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
     anthropic: false,
     google: false,
     mistral: false,
-    deepseek: false
+    deepseek: false,
+    nvidia: false,
   });
 
   // Council Configuration (unified across all providers)
@@ -106,7 +108,7 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
     stage2_prompt: '',
     stage3_prompt: '',
     title_prompt: '',
-
+    query_prompt: '',
   });
   const [activePromptTab, setActivePromptTab] = useState('stage1');
 
@@ -164,6 +166,8 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
       if (prompts.stage1_prompt !== settings.stage1_prompt) return true;
       if (prompts.stage2_prompt !== settings.stage2_prompt) return true;
       if (prompts.stage3_prompt !== settings.stage3_prompt) return true;
+      if (prompts.title_prompt !== settings.title_prompt) return true;
+      if (prompts.query_prompt !== settings.query_prompt) return true;
 
       // Note: API keys are auto-saved on test, so we don't check them here
 
@@ -203,9 +207,11 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
 
   // Effect 1: Auto-update Council Member filters when providers change or members are added
   useEffect(() => {
+    let changed = false;
+    const indicesToClear = [];
+
     setCouncilMemberFilters(prev => {
       const next = { ...prev };
-      let changed = false;
       // Check all council member indices
       for (let i = 0; i < councilModels.length; i++) {
         const currentFilter = next[i] || 'remote'; // Default is 'remote'
@@ -213,12 +219,22 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
         if (newFilter !== currentFilter) {
           next[i] = newFilter;
           changed = true;
-          // Clear model if filter changed to force re-selection
-          handleCouncilModelChange(i, '');
+          indicesToClear.push(i);
         }
       }
       return changed ? next : prev;
     });
+
+    // Clear models whose filter changed to force re-selection
+    if (indicesToClear.length > 0) {
+      setCouncilModels(prev => {
+        const updated = [...prev];
+        indicesToClear.forEach(i => {
+          updated[i] = '';
+        });
+        return updated;
+      });
+    }
   }, [enabledProviders, councilModels.length]);
 
   // Effect 2: Auto-update Chairman and Search filters when providers change
@@ -359,7 +375,8 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
           anthropic: !!data.anthropic_api_key_set,
           google: !!data.google_api_key_set,
           mistral: !!data.mistral_api_key_set,
-          deepseek: !!data.deepseek_api_key_set
+          deepseek: !!data.deepseek_api_key_set,
+          nvidia: !!data.nvidia_api_key_set,
         });
       }
 
@@ -400,7 +417,8 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
         stage1_prompt: data.stage1_prompt || '',
         stage2_prompt: data.stage2_prompt || '',
         stage3_prompt: data.stage3_prompt || '',
-
+        title_prompt: data.title_prompt || '',
+        query_prompt: data.query_prompt || '',
       });
 
       // Clear Direct Keys (for security)
@@ -409,7 +427,8 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
         anthropic_api_key: '',
         google_api_key: '',
         mistral_api_key: '',
-        deepseek_api_key: ''
+        deepseek_api_key: '',
+        nvidia_api_key: '',
       });
       setGroqApiKey(''); // Clear Groq key too
 
@@ -1426,9 +1445,19 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
 
   if (!settings) {
     return (
-      <div className="settings-overlay">
-        <div className="settings-modal">
-          <div className="settings-loading">Loading settings...</div>
+      <div className="settings-overlay" onClick={onClose}>
+        <div className="settings-modal" onClick={e => e.stopPropagation()}>
+          <div className="settings-header">
+            <h2>Settings</h2>
+            <button className="close-button" onClick={onClose}>&times;</button>
+          </div>
+          <div className="settings-body" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '200px' }}>
+            {error ? (
+              <div className="settings-error">{error}</div>
+            ) : (
+              <div className="settings-loading">Loading settings...</div>
+            )}
+          </div>
         </div>
       </div>
     );

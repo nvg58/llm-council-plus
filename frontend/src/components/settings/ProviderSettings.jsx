@@ -7,6 +7,7 @@ import anthropicIcon from '../../assets/icons/anthropic.svg';
 import googleIcon from '../../assets/icons/google.svg';
 import mistralIcon from '../../assets/icons/mistral.svg';
 import deepseekIcon from '../../assets/icons/deepseek.svg';
+import nvidiaIcon from '../../assets/icons/nvidia.svg';
 import customEndpointIcon from '../../assets/icons/openai-compatible.svg';
 
 const PROVIDER_ICONS = {
@@ -15,6 +16,7 @@ const PROVIDER_ICONS = {
     google: googleIcon,
     mistral: mistralIcon,
     deepseek: deepseekIcon,
+    nvidia: nvidiaIcon,
 };
 
 const DIRECT_PROVIDERS = [
@@ -23,6 +25,7 @@ const DIRECT_PROVIDERS = [
     { id: 'google', name: 'Google', key: 'google_api_key' },
     { id: 'mistral', name: 'Mistral', key: 'mistral_api_key' },
     { id: 'deepseek', name: 'DeepSeek', key: 'deepseek_api_key' },
+    { id: 'nvidia', name: 'NVIDIA Build', key: 'nvidia_api_key' },
 ];
 
 export default function ProviderSettings({

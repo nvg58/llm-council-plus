@@ -17,6 +17,8 @@ from . import storage
 from .council import generate_conversation_title, generate_search_query, stage1_collect_responses, stage2_collect_rankings, stage3_synthesize_final, calculate_aggregate_rankings, PROVIDERS
 from .search import perform_web_search, SearchProvider
 from .settings import get_settings, save_settings, update_settings, Settings, DEFAULT_COUNCIL_MODELS, DEFAULT_CHAIRMAN_MODEL, AVAILABLE_MODELS
+from .personas import get_all_personas, save_persona_override, delete_persona_override, get_persona
+from .advisors import run_debate
 
 logger = logging.getLogger(__name__)
 
@@ -100,8 +102,7 @@ CORS_FRONTEND_HOSTS = [
     if origin.strip()
 ]
 
-# Suppress the dev-ports regex when the built frontend exists — same-origin, no CORS needed.
-_dev_cors_regex = None if (os.path.isdir(FRONTEND_DIST_DIR) or CORS_FRONTEND_HOSTS) else r"http://.*:(5173|5174|3000)"
+_dev_cors_regex = r"https?://(localhost|127\.0\.0\.1):\d+"
 
 app.add_middleware(
     CORSMiddleware,
@@ -115,7 +116,18 @@ app.add_middleware(
 
 class CreateConversationRequest(BaseModel):
     """Request to create a new conversation."""
-    pass
+    mode: str = "council"
+
+
+class StartDebateRequest(BaseModel):
+    """Request to start an advisor debate."""
+    question: str
+    persona_ids: List[str]
+    model_assignments: Optional[Dict[str, str]] = None
+    default_model: Optional[str] = None
+    max_rounds: int = 2
+    web_search: bool = False
+    search_provider: Optional[str] = None
 
 
 ExecutionMode = Literal["chat_only", "chat_ranking", "full"]
@@ -124,6 +136,7 @@ ExecutionMode = Literal["chat_only", "chat_ranking", "full"]
 class SendMessageRequest(BaseModel):
     content: str
     web_search: bool = False
+    search_provider: Optional[str] = None
     execution_mode: ExecutionMode = "full"
     council_models: Optional[List[str]] = None
     chairman_model: Optional[str] = None
@@ -144,9 +157,10 @@ def _validate_execution_mode(mode: str) -> None:
         raise HTTPException(status_code=400, detail=f"Invalid execution_mode. Must be one of: {list(valid)}")
 
 
-def _apply_search_env(settings: Settings) -> SearchProvider:
+def _apply_search_env(settings: Settings, provider_override: Optional[str] = None) -> SearchProvider:
     """Set env vars for the active search provider and return it."""
-    provider = SearchProvider(settings.search_provider)
+    provider_str = provider_override if provider_override else settings.search_provider
+    provider = SearchProvider(provider_str)
     if settings.serper_api_key and provider == SearchProvider.SERPER:
         os.environ["SERPER_API_KEY"] = settings.serper_api_key
     if settings.tavily_api_key and provider == SearchProvider.TAVILY:
@@ -158,10 +172,10 @@ def _apply_search_env(settings: Settings) -> SearchProvider:
     return provider
 
 
-async def _fetch_search_context(content: str, settings: Settings) -> tuple:
+async def _fetch_search_context(content: str, settings: Settings, provider_override: Optional[str] = None) -> tuple:
     """Run web search and return (search_context, search_query)."""
-    provider = _apply_search_env(settings)
-    search_query = generate_search_query(content)
+    provider = _apply_search_env(settings, provider_override)
+    search_query = await generate_search_query(content)
     search_result = await perform_web_search(
         search_query,
         settings.search_result_count,
@@ -251,6 +265,7 @@ class ConversationMetadata(BaseModel):
     id: str
     created_at: str
     title: str
+    mode: str = "council"
     message_count: int
 
 
@@ -259,6 +274,7 @@ class Conversation(BaseModel):
     id: str
     created_at: str
     title: str
+    mode: str = "council"
     messages: List[Dict[str, Any]]
 
 
@@ -290,7 +306,7 @@ async def list_conversations():
 async def create_conversation(request: CreateConversationRequest):
     """Create a new conversation."""
     conversation_id = str(uuid.uuid4())
-    conversation = storage.create_conversation(conversation_id)
+    conversation = storage.create_conversation(conversation_id, mode=request.mode)
     return conversation
 
 
@@ -341,19 +357,19 @@ async def send_message_stream(conversation_id: str, body: SendMessageRequest, re
 
             search_context = ""
             search_query = ""
-            if body.web_search:
+            if body.search_provider or body.web_search:
                 if await request.is_disconnected():
                     raise asyncio.CancelledError("Client disconnected")
 
                 settings = get_settings()
-                provider = _apply_search_env(settings)
+                provider = _apply_search_env(settings, body.search_provider)
 
                 yield f"data: {json.dumps({'type': 'search_start', 'data': {'provider': provider.value}})}\n\n"
 
                 if await request.is_disconnected():
                     raise asyncio.CancelledError("Client disconnected")
 
-                search_query = generate_search_query(body.content)
+                search_query = await generate_search_query(body.content)
 
                 if await request.is_disconnected():
                     raise asyncio.CancelledError("Client disconnected")
@@ -503,6 +519,136 @@ async def send_message_stream(conversation_id: str, body: SendMessageRequest, re
     )
 
 
+@app.get("/api/personas")
+async def list_personas():
+    """List all available advisor personas (with user overrides applied)."""
+    return [p.model_dump() for p in get_all_personas()]
+
+
+class PersonaOverrideRequest(BaseModel):
+    name: Optional[str] = None
+    role: Optional[str] = None
+    description: Optional[str] = None
+    system_prompt: Optional[str] = None
+    avatar_emoji: Optional[str] = None
+
+
+@app.patch("/api/personas/{persona_id}")
+async def update_persona(persona_id: str, body: PersonaOverrideRequest):
+    """Save user overrides for a persona."""
+    if not get_persona(persona_id):
+        raise HTTPException(status_code=404, detail="Persona not found")
+    updated = save_persona_override(persona_id, body.model_dump(exclude_none=True))
+    return updated.model_dump()
+
+
+@app.delete("/api/personas/{persona_id}/override")
+async def reset_persona(persona_id: str):
+    """Remove user overrides and restore persona defaults."""
+    if not get_persona(persona_id):
+        raise HTTPException(status_code=404, detail="Persona not found")
+    restored = delete_persona_override(persona_id)
+    return restored.model_dump()
+
+
+@app.post("/api/conversations/{conversation_id}/debate/stream")
+async def start_debate_stream(conversation_id: str, body: StartDebateRequest, request: Request):
+    """Start an advisor debate and stream results via SSE."""
+    conversation = storage.get_conversation(conversation_id)
+    if conversation is None:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    if len(body.persona_ids) < 2:
+        raise HTTPException(status_code=400, detail="At least 2 advisors required")
+    if len(body.persona_ids) > 4:
+        raise HTTPException(status_code=400, detail="Maximum 4 advisors allowed")
+    if body.max_rounds < 1 or body.max_rounds > 10:
+        raise HTTPException(status_code=400, detail="Rounds must be between 1 and 10")
+
+    is_first_message = len(conversation["messages"]) == 0
+
+    async def event_generator():
+        try:
+            storage.add_user_message(conversation_id, body.question, conversation=conversation)
+
+            search_context = ""
+            if body.search_provider or body.web_search:
+                settings = get_settings()
+                yield f"data: {json.dumps({'type': 'advisor_search_start'})}\n\n"
+                search_context, search_query, _ = await _fetch_search_context(body.question, settings, body.search_provider)
+                yield f"data: {json.dumps({'type': 'advisor_search_complete', 'data': {'search_query': search_query}})}\n\n"
+
+            all_rounds = []
+            verdict_data = None
+            tiebreaker_data = None
+
+            web_search_used = bool(body.search_provider or body.web_search)
+            async for event in run_debate(
+                question=body.question,
+                persona_ids=body.persona_ids,
+                model_assignments=body.model_assignments,
+                default_model=body.default_model,
+                max_rounds=body.max_rounds,
+                web_search=web_search_used,
+                search_context=search_context,
+                request=request,
+            ):
+                event_type = event.get("type", "")
+
+                if event_type == "advisor_complete":
+                    all_rounds = event["data"]["rounds"]
+                    verdict_data = event["data"]["verdict"]
+                    tiebreaker_data = event["data"].get("tiebreaker")
+
+                yield f"data: {json.dumps(event)}\n\n"
+
+            metadata = {
+                "persona_ids": body.persona_ids,
+                "default_model": body.default_model,
+                "model_assignments": body.model_assignments,
+                "max_rounds": body.max_rounds,
+                "web_search": web_search_used,
+            }
+            if search_context:
+                metadata["search_context"] = search_context
+
+            storage.add_advisor_message(
+                conversation_id,
+                rounds=all_rounds,
+                verdict=verdict_data,
+                tiebreaker=tiebreaker_data,
+                metadata=metadata,
+                conversation=conversation,
+            )
+
+            if is_first_message:
+                title = await generate_conversation_title(body.question)
+                storage.update_conversation_title(conversation_id, title)
+                yield f"data: {json.dumps({'type': 'title_complete', 'data': {'title': title}})}\n\n"
+
+        except asyncio.CancelledError:
+            if is_first_message:
+                try:
+                    title = await generate_conversation_title(body.question)
+                    storage.update_conversation_title(conversation_id, title)
+                except Exception:
+                    pass
+            raise
+        except Exception as e:
+            logger.error(f"Debate stream error: {e}")
+            storage.add_error_message(conversation_id, f"Debate error: {str(e)}")
+            yield f"data: {json.dumps({'type': 'advisor_error', 'message': str(e)})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        }
+    )
+
+
 @app.post("/api/conversations/{conversation_id}/message")
 async def send_message_sync(conversation_id: str, body: SendMessageRequest):
     """Send a message and return JSON response (non-streaming)."""
@@ -623,6 +769,7 @@ class UpdateSettingsRequest(BaseModel):
     mistral_api_key: Optional[str] = None
     deepseek_api_key: Optional[str] = None
     groq_api_key: Optional[str] = None
+    nvidia_api_key: Optional[str] = None
 
     # Enabled Providers
     enabled_providers: Optional[Dict[str, bool]] = None
@@ -649,6 +796,12 @@ class UpdateSettingsRequest(BaseModel):
     stage1_prompt: Optional[str] = None
     stage2_prompt: Optional[str] = None
     stage3_prompt: Optional[str] = None
+
+    # Advisor Settings
+    advisor_default_model: Optional[str] = None
+    advisor_tiebreaker_model: Optional[str] = None
+    advisor_temperature: Optional[float] = None
+    advisor_default_rounds: Optional[int] = None
 
 
 
@@ -684,6 +837,7 @@ async def get_app_settings():
         "mistral_api_key_set": bool(settings.mistral_api_key),
         "deepseek_api_key_set": bool(settings.deepseek_api_key),
         "groq_api_key_set": bool(settings.groq_api_key),
+        "nvidia_api_key_set": bool(settings.nvidia_api_key),
         "custom_endpoint_api_key_set": bool(settings.custom_endpoint_api_key),
 
         # Enabled Providers
@@ -708,6 +862,12 @@ async def get_app_settings():
         "stage1_prompt": settings.stage1_prompt,
         "stage2_prompt": settings.stage2_prompt,
         "stage3_prompt": settings.stage3_prompt,
+
+        # Advisor Settings
+        "advisor_default_model": settings.advisor_default_model,
+        "advisor_tiebreaker_model": settings.advisor_tiebreaker_model,
+        "advisor_temperature": settings.advisor_temperature,
+        "advisor_default_rounds": settings.advisor_default_rounds,
     }
 
 
@@ -719,7 +879,8 @@ async def get_default_settings():
         STAGE1_PROMPT_DEFAULT,
         STAGE2_PROMPT_DEFAULT,
         STAGE3_PROMPT_DEFAULT,
-        TITLE_PROMPT_DEFAULT
+        TITLE_PROMPT_DEFAULT,
+        QUERY_PROMPT_DEFAULT
     )
     from .settings import DEFAULT_ENABLED_PROVIDERS
     return {
@@ -729,6 +890,8 @@ async def get_default_settings():
         "stage1_prompt": STAGE1_PROMPT_DEFAULT,
         "stage2_prompt": STAGE2_PROMPT_DEFAULT,
         "stage3_prompt": STAGE3_PROMPT_DEFAULT,
+        "title_prompt": TITLE_PROMPT_DEFAULT,
+        "query_prompt": QUERY_PROMPT_DEFAULT,
     }
 
 
@@ -853,6 +1016,8 @@ async def update_app_settings(request: UpdateSettingsRequest):
         updates["deepseek_api_key"] = request.deepseek_api_key
     if request.groq_api_key is not None:
         updates["groq_api_key"] = request.groq_api_key
+    if request.nvidia_api_key is not None:
+        updates["nvidia_api_key"] = request.nvidia_api_key
 
     # Enabled Providers
     if request.enabled_providers is not None:
@@ -898,6 +1063,15 @@ async def update_app_settings(request: UpdateSettingsRequest):
         _validate_execution_mode(request.execution_mode)
         updates["execution_mode"] = request.execution_mode
 
+    if request.advisor_default_model is not None:
+        updates["advisor_default_model"] = request.advisor_default_model
+    if request.advisor_tiebreaker_model is not None:
+        updates["advisor_tiebreaker_model"] = request.advisor_tiebreaker_model
+    if request.advisor_temperature is not None:
+        updates["advisor_temperature"] = request.advisor_temperature
+    if request.advisor_default_rounds is not None:
+        updates["advisor_default_rounds"] = max(1, min(10, request.advisor_default_rounds))
+
     if updates:
         settings = update_settings(**updates)
     else:
@@ -925,6 +1099,7 @@ async def update_app_settings(request: UpdateSettingsRequest):
         "mistral_api_key_set": bool(settings.mistral_api_key),
         "deepseek_api_key_set": bool(settings.deepseek_api_key),
         "groq_api_key_set": bool(settings.groq_api_key),
+        "nvidia_api_key_set": bool(settings.nvidia_api_key),
         "custom_endpoint_api_key_set": bool(settings.custom_endpoint_api_key),
 
         # Enabled Providers
@@ -943,6 +1118,12 @@ async def update_app_settings(request: UpdateSettingsRequest):
         "stage1_prompt": settings.stage1_prompt,
         "stage2_prompt": settings.stage2_prompt,
         "stage3_prompt": settings.stage3_prompt,
+
+        # Advisor Settings
+        "advisor_default_model": settings.advisor_default_model,
+        "advisor_tiebreaker_model": settings.advisor_tiebreaker_model,
+        "advisor_temperature": settings.advisor_temperature,
+        "advisor_default_rounds": settings.advisor_default_rounds,
     }
 
 
