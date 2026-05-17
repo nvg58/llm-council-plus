@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { api } from '../api';
+import React, { useState, useEffect, useRef } from 'react';
+import { api, buildAvailableSearchProviders } from '../api';
 import SearchableModelSelect from './SearchableModelSelect';
 import './AdvisorSetup.css';
 
@@ -18,19 +18,37 @@ export default function AdvisorSetup({
   const [chosenModel, setChosenModel] = useState('');
   const [modelAssignments, setModelAssignments] = useState({});
   const [rounds, setRounds] = useState(2);
-  const [webSearch, setWebSearch] = useState(false);
+  const [editingPersona, setEditingPersona] = useState(null);
+  const [editForm, setEditForm] = useState({ name: '', role: '', description: '', system_prompt: '', avatar_emoji: '' });
+  const [editSaving, setEditSaving] = useState(false);
+  const [searchProvider, setSearchProvider] = useState(null);
+  const [availableSearchProviders, setAvailableSearchProviders] = useState([{ id: 'duckduckgo', name: 'DuckDuckGo' }]);
+  const [searchPopoverOpen, setSearchPopoverOpen] = useState(false);
+  const searchPopoverRef = useRef(null);
   const [question, setQuestion] = useState('');
+  const [personasExpanded, setPersonasExpanded] = useState(true);
 
-  // Fetch personas and all configured models on mount in parallel
   useEffect(() => {
-    api.getPersonas()
-      .then(setPersonas)
-      .catch(() => setPersonas([]))
-      .finally(() => setPersonasLoading(false));
+    const handleClickOutside = (e) => {
+      if (searchPopoverRef.current && !searchPopoverRef.current.contains(e.target)) {
+        setSearchPopoverOpen(false);
+      }
+    };
+    if (searchPopoverOpen) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [searchPopoverOpen]);
 
+  useEffect(() => {
     const fetchModels = async () => {
       try {
-        const settings = await api.getSettings();
+        const [personasResult, settings] = await Promise.all([
+          api.getPersonas().catch(() => []),
+          api.getSettings(),
+        ]);
+        setPersonas(personasResult);
+
+        setAvailableSearchProviders(buildAvailableSearchProviders(settings));
+
         const enabled = settings.enabled_providers || {};
         const ollamaUrl = settings.ollama_base_url || 'http://localhost:11434';
 
@@ -75,6 +93,7 @@ export default function AdvisorSetup({
       } catch (err) {
         console.error('Failed to load advisor models:', err);
       } finally {
+        setPersonasLoading(false);
         setModelsLoading(false);
       }
     };
@@ -109,10 +128,58 @@ export default function AdvisorSetup({
     setRounds((prev) => Math.min(10, Math.max(1, prev + delta)));
   };
 
+  const openEditModal = (e, persona) => {
+    e.stopPropagation();
+    setEditingPersona(persona);
+    setEditForm({
+      name: persona.name,
+      role: persona.role,
+      description: persona.description,
+      system_prompt: persona.system_prompt,
+      avatar_emoji: persona.avatar_emoji,
+    });
+  };
+
+  const closeEditModal = () => {
+    setEditingPersona(null);
+    setEditSaving(false);
+  };
+
+  const runEditAction = async (apiFn, errorMsg) => {
+    if (!editingPersona || editSaving) return;
+    setEditSaving(true);
+    try {
+      const result = await apiFn(editingPersona.id);
+      setPersonas((prev) => prev.map((p) => p.id === result.id ? result : p));
+      closeEditModal();
+    } catch (err) {
+      console.error(errorMsg, err);
+      setEditSaving(false);
+    }
+  };
+
+  const handleEditSave = () => runEditAction(
+    (id) => api.updatePersona(id, editForm),
+    'Failed to save persona:'
+  );
+
+  const handleEditReset = () => runEditAction(
+    api.resetPersona,
+    'Failed to reset persona:'
+  );
+
   const canStart =
     selectedPersonaIds.length >= 2 &&
     (modelMode === 'simple' ? !!chosenModel : selectedPersonaIds.every((id) => !!modelAssignments[id])) &&
     question.trim().length > 0;
+
+  const getHint = () => {
+    if (canStart) return '↵ Enter to start · Shift+Enter for new line';
+    if (question.trim().length === 0) return 'Fill in the form below, then start your debate';
+    if (selectedPersonaIds.length < 2) return '⚠ Select at least 2 advisors below';
+    if (modelMode === 'simple' && !chosenModel) return '⚠ Choose a model below';
+    return '⚠ Assign a model to each advisor';
+  };
 
   const handleSubmit = () => {
     if (!canStart || isLoading) return;
@@ -122,7 +189,7 @@ export default function AdvisorSetup({
       defaultModel: chosenModel,
       modelAssignments: modelMode === 'advanced' ? modelAssignments : null,
       maxRounds: rounds,
-      webSearch,
+      searchProvider,
     };
     onStartDebate(payload);
   };
@@ -133,19 +200,42 @@ export default function AdvisorSetup({
 
   return (
     <div className="advisor-setup">
-      {/* Question Textarea — top, primary input */}
-      <div className="advisor-setup__section">
+      {/* Question Textarea + Start Debate — primary input card */}
+      <div className="advisor-setup__section advisor-setup__question-card">
         <label className="advisor-setup__section-label" htmlFor="advisor-question">
           Debate Question
         </label>
         <textarea
           id="advisor-question"
           className="advisor-setup__question"
-          placeholder="What should your advisors debate?"
+          placeholder="What should your advisors debate? (Shift+Enter for new line)"
           rows={4}
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              handleSubmit();
+            }
+          }}
         />
+        <div className="advisor-setup__question-footer">
+          <span className="advisor-setup__question-hint">
+            {getHint()}
+          </span>
+          <button
+            type="button"
+            className={`advisor-setup__start-btn advisor-setup__start-btn--inline ${canStart && !isLoading ? 'advisor-setup__start-btn--ready' : ''}`}
+            onClick={handleSubmit}
+            disabled={!canStart || isLoading}
+          >
+            {isLoading ? (
+              <><span className="advisor-setup__spinner" aria-hidden="true" /> Starting…</>
+            ) : (
+              'Start Debate ➤'
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Rounds + Web Search — compact config directly below question */}
@@ -176,77 +266,124 @@ export default function AdvisorSetup({
             </div>
           </div>
 
-          <label className="advisor-setup__websearch-toggle">
-            <span className="advisor-setup__config-label">
-              <span aria-hidden="true">🌐</span> Web Search
-            </span>
-            <div
-              className={`advisor-setup__toggle ${webSearch ? 'advisor-setup__toggle--on' : ''}`}
-              onClick={() => setWebSearch((prev) => !prev)}
-              role="switch"
-              aria-checked={webSearch}
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === ' ' || e.key === 'Enter') setWebSearch((prev) => !prev);
-              }}
+          <div className="advisor-setup__websearch-picker" ref={searchPopoverRef}>
+            <span className="advisor-setup__config-label">Web Search</span>
+            <button
+              type="button"
+              className={`advisor-setup__search-btn ${searchProvider ? 'advisor-setup__search-btn--active' : ''}`}
+              onClick={() => setSearchPopoverOpen((v) => !v)}
+              aria-haspopup="listbox"
+              aria-expanded={searchPopoverOpen}
             >
-              <div className="advisor-setup__toggle-knob" />
-            </div>
-          </label>
+              <span>🌐</span>
+              <span>{searchProvider ? (availableSearchProviders.find(p => p.id === searchProvider)?.name || searchProvider) : 'Off'}</span>
+              <span className="advisor-setup__search-chevron">›</span>
+            </button>
+            {searchPopoverOpen && (
+              <div className="advisor-setup__search-popover" role="listbox">
+                <button
+                  type="button"
+                  className={`advisor-setup__search-option ${!searchProvider ? 'advisor-setup__search-option--selected' : ''}`}
+                  onClick={() => { setSearchProvider(null); setSearchPopoverOpen(false); }}
+                >
+                  <span>✕</span> Off
+                </button>
+                {availableSearchProviders.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    className={`advisor-setup__search-option ${searchProvider === p.id ? 'advisor-setup__search-option--selected' : ''}`}
+                    onClick={() => { setSearchProvider(p.id); setSearchPopoverOpen(false); }}
+                  >
+                    <span>🌐</span> {p.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
-
-      {/* Use Recommended Button */}
-      <div className="advisor-setup__recommended-row">
-        <button
-          className="advisor-setup__recommended-btn"
-          onClick={handleUseRecommended}
-          type="button"
-        >
-          <span className="advisor-setup__recommended-icon">⚡</span>
-          Use Recommended Panel
-          <span className="advisor-setup__recommended-hint">Skeptic · Pragmatist · Innovator</span>
-        </button>
       </div>
 
       {/* Persona Gallery */}
       <div className="advisor-setup__section">
-        <div className="advisor-setup__section-header">
+        <button
+          type="button"
+          className="advisor-setup__section-header advisor-setup__section-header--collapsible"
+          onClick={() => setPersonasExpanded((v) => !v)}
+          aria-expanded={personasExpanded}
+        >
           <span className="advisor-setup__section-label">Choose Advisors</span>
-          <span className={`advisor-setup__count-badge ${selectedCount >= 2 ? 'advisor-setup__count-badge--valid' : ''}`}>
-            {selectedCount} / 4 selected
-          </span>
-        </div>
-
-        {personasLoading ? (
-          <div className="advisor-setup__personas-loading">Loading advisors...</div>
-        ) : (
-          <div className="advisor-setup__persona-gallery">
-            {personas.map((persona) => {
-              const selected = selectedPersonaIds.includes(persona.id);
-              return (
-                <button
-                  key={persona.id}
-                  type="button"
-                  className={`advisor-setup__persona-card ${selected ? 'advisor-setup__persona-card--selected' : ''} ${!selected && selectedCount >= 4 ? 'advisor-setup__persona-card--disabled' : ''}`}
-                  onClick={() => togglePersona(persona.id)}
-                  style={selected ? { '--persona-color': persona.color } : {}}
-                  aria-pressed={selected}
-                >
-                  <span className="advisor-setup__persona-emoji">{persona.avatar_emoji}</span>
-                  <span className="advisor-setup__persona-name">{persona.name}</span>
-                  <span className="advisor-setup__persona-role">{persona.role}</span>
-                  <span className="advisor-setup__persona-desc">{persona.description}</span>
-                  {selected && (
-                    <span className="advisor-setup__persona-check" style={{ backgroundColor: persona.color }}>
-                      ✓
-                    </span>
-                  )}
-                </button>
-              );
-            })}
+          <div className="advisor-setup__section-header-right">
+            <span className={`advisor-setup__count-badge ${selectedCount >= 2 ? 'advisor-setup__count-badge--valid' : ''}`}>
+              {selectedCount} / 4 selected
+            </span>
+            <span className={`advisor-setup__chevron ${personasExpanded ? '' : 'advisor-setup__chevron--collapsed'}`}>
+              ›
+            </span>
           </div>
-        )}
+        </button>
+
+        <div className={`advisor-setup__collapsible ${personasExpanded ? 'advisor-setup__collapsible--open' : ''}`}>
+          <div className="advisor-setup__collapsible-inner">
+            {/* Use Recommended Button */}
+            <div className="advisor-setup__recommended-row">
+              <button
+                className="advisor-setup__recommended-btn"
+                onClick={handleUseRecommended}
+                type="button"
+              >
+                <span className="advisor-setup__recommended-icon">⚡</span>
+                Use Recommended Panel
+                <span className="advisor-setup__recommended-hint">Skeptic · Pragmatist · Innovator</span>
+              </button>
+            </div>
+
+            {personasLoading ? (
+              <div className="advisor-setup__personas-loading">Loading advisors...</div>
+            ) : (
+              <div className="advisor-setup__persona-gallery">
+                {personas.map((persona) => {
+                  const selected = selectedPersonaIds.includes(persona.id);
+                  return (
+                    <div
+                      key={persona.id}
+                      role="button"
+                      tabIndex={!selected && selectedCount >= 4 ? -1 : 0}
+                      className={`advisor-setup__persona-card ${selected ? 'advisor-setup__persona-card--selected' : ''} ${!selected && selectedCount >= 4 ? 'advisor-setup__persona-card--disabled' : ''} ${persona.is_customized ? 'advisor-setup__persona-card--customized' : ''}`}
+                      onClick={() => togglePersona(persona.id)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); togglePersona(persona.id); } }}
+                      style={selected ? { '--persona-color': persona.color } : {}}
+                      aria-pressed={selected}
+                    >
+                      <button
+                        type="button"
+                        className="advisor-setup__persona-edit-btn"
+                        onClick={(e) => openEditModal(e, persona)}
+                        title="Edit persona"
+                        aria-label={`Edit ${persona.name}`}
+                        tabIndex={0}
+                      >
+                        ✏️
+                      </button>
+                      <span className="advisor-setup__persona-emoji">{persona.avatar_emoji}</span>
+                      <span className="advisor-setup__persona-name">{persona.name}</span>
+                      <span className="advisor-setup__persona-role">{persona.role}</span>
+                      <span className="advisor-setup__persona-desc">{persona.description}</span>
+                      {persona.is_customized && (
+                        <span className="advisor-setup__persona-custom-badge" title="Customized">✦</span>
+                      )}
+                      {selected && (
+                        <span className="advisor-setup__persona-check" style={{ backgroundColor: persona.color }}>
+                          ✓
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Model Assignment */}
@@ -317,34 +454,107 @@ export default function AdvisorSetup({
         )}
       </div>
 
-      {/* Start Button */}
-      <button
-        type="button"
-        className={`advisor-setup__start-btn ${canStart && !isLoading ? 'advisor-setup__start-btn--ready' : ''}`}
-        onClick={handleSubmit}
-        disabled={!canStart || isLoading}
-      >
-        {isLoading ? (
-          <>
-            <span className="advisor-setup__spinner" aria-hidden="true" />
-            Starting Debate...
-          </>
-        ) : (
-          'Start Debate'
-        )}
-      </button>
+      {/* Edit Persona Modal */}
+      {editingPersona && (
+        <div className="advisor-setup__edit-overlay" onClick={closeEditModal}>
+          <div className="advisor-setup__edit-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="advisor-setup__edit-header">
+              <span className="advisor-setup__edit-emoji">{editingPersona.avatar_emoji}</span>
+              <span className="advisor-setup__edit-title">Edit Persona</span>
+              <button type="button" className="advisor-setup__edit-close" onClick={closeEditModal} aria-label="Close">✕</button>
+            </div>
 
-      {/* Validation hint */}
-      {!canStart && !isLoading && (
-        <p className="advisor-setup__hint">
-          {selectedPersonaIds.length < 2
-            ? 'Select at least 2 advisors'
-            : modelMode === 'simple' && !chosenModel
-              ? 'Choose a model'
-              : modelMode === 'advanced' && !selectedPersonaIds.every((id) => !!modelAssignments[id])
-                ? 'Assign a model to each selected advisor'
-                : 'Enter a debate question'}
-        </p>
+            <div className="advisor-setup__edit-body">
+              <div className="advisor-setup__edit-emoji-row">
+                <label className="advisor-setup__edit-field advisor-setup__edit-field--emoji">
+                  <span className="advisor-setup__edit-label">Emoji / Icon</span>
+                  <input
+                    type="text"
+                    className="advisor-setup__edit-input advisor-setup__edit-emoji-input"
+                    value={editForm.avatar_emoji}
+                    onChange={(e) => setEditForm((f) => ({ ...f, avatar_emoji: e.target.value }))}
+                    placeholder="e.g. 🔍"
+                    maxLength={4}
+                  />
+                </label>
+                <div className="advisor-setup__edit-emoji-preview">
+                  {editForm.avatar_emoji || editingPersona?.avatar_emoji}
+                </div>
+              </div>
+
+              <label className="advisor-setup__edit-field">
+                <span className="advisor-setup__edit-label">Name</span>
+                <input
+                  type="text"
+                  className="advisor-setup__edit-input"
+                  value={editForm.name}
+                  onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                />
+              </label>
+
+              <label className="advisor-setup__edit-field">
+                <span className="advisor-setup__edit-label">Role</span>
+                <input
+                  type="text"
+                  className="advisor-setup__edit-input"
+                  value={editForm.role}
+                  onChange={(e) => setEditForm((f) => ({ ...f, role: e.target.value }))}
+                />
+              </label>
+
+              <label className="advisor-setup__edit-field">
+                <span className="advisor-setup__edit-label">Description</span>
+                <textarea
+                  className="advisor-setup__edit-textarea advisor-setup__edit-textarea--short"
+                  rows={2}
+                  value={editForm.description}
+                  onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))}
+                />
+              </label>
+
+              <label className="advisor-setup__edit-field">
+                <span className="advisor-setup__edit-label">System Prompt</span>
+                <textarea
+                  className="advisor-setup__edit-textarea"
+                  rows={7}
+                  value={editForm.system_prompt}
+                  onChange={(e) => setEditForm((f) => ({ ...f, system_prompt: e.target.value }))}
+                />
+              </label>
+            </div>
+
+            <div className="advisor-setup__edit-footer">
+              {editingPersona.is_customized && (
+                <button
+                  type="button"
+                  className="advisor-setup__edit-btn advisor-setup__edit-btn--reset"
+                  onClick={handleEditReset}
+                  disabled={editSaving}
+                >
+                  Reset to Default
+                </button>
+              )}
+              <div className="advisor-setup__edit-footer-right">
+                <button
+                  type="button"
+                  className="advisor-setup__edit-btn advisor-setup__edit-btn--cancel"
+                  onClick={closeEditModal}
+                  disabled={editSaving}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="advisor-setup__edit-btn advisor-setup__edit-btn--save"
+                  onClick={handleEditSave}
+                  disabled={editSaving}
+                >
+                  {editSaving ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

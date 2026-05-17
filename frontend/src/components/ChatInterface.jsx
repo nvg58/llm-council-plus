@@ -9,7 +9,6 @@ import CouncilGrid from './CouncilGrid';
 import ExecutionModeToggle from './ExecutionModeToggle';
 import DebateView from './DebateView';
 import AdvisorSetup from './AdvisorSetup';
-import { api } from '../api';
 import './ChatInterface.css';
 
 export default function ChatInterface({
@@ -24,11 +23,14 @@ export default function ChatInterface({
     executionMode,
     onExecutionModeChange,
     searchProvider = 'duckduckgo',
+    availableSearchProviders = [{ id: 'duckduckgo', name: 'DuckDuckGo' }],
     mode = 'council',
     onStartDebate,
 }) {
     const [input, setInput] = useState('');
-    const [webSearch, setWebSearch] = useState(false);
+    const [activeSearchProvider, setActiveSearchProvider] = useState(null);
+    const [searchPopoverOpen, setSearchPopoverOpen] = useState(false);
+    const searchPopoverRef = useRef(null);
     const messagesEndRef = useRef(null);
     const messagesContainerRef = useRef(null);
 
@@ -51,10 +53,20 @@ export default function ChatInterface({
         }
     }, [conversation]);
 
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (searchPopoverRef.current && !searchPopoverRef.current.contains(e.target)) {
+                setSearchPopoverOpen(false);
+            }
+        };
+        if (searchPopoverOpen) document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [searchPopoverOpen]);
+
     const handleSubmit = (e) => {
         e.preventDefault();
         if (input.trim() && !isLoading) {
-            onSendMessage(input, webSearch);
+            onSendMessage(input, activeSearchProvider);
             setInput('');
         }
     };
@@ -100,7 +112,7 @@ export default function ChatInterface({
             {/* Messages Area */}
             <div className="messages-area" ref={messagesContainerRef}>
                 {mode === 'advisors' && (!conversation || conversation.messages.length === 0) ? (
-                    <div className="hero-container">
+                    <div className="advisor-setup-scroll">
                         <AdvisorSetup
                             onStartDebate={onStartDebate}
                             isLoading={isLoading}
@@ -148,12 +160,7 @@ export default function ChatInterface({
                                             <div className="stage-loading">
                                                 <div className="spinner"></div>
                                                 <span>
-                                                    🔍 Searching the web with {
-                                                        searchProvider === 'duckduckgo' ? 'DuckDuckGo' :
-                                                            searchProvider === 'tavily' ? 'Tavily' :
-                                                                searchProvider === 'brave' ? 'Brave' :
-                                                                    'Provider'
-                                                    }...
+                                                    🔍 Searching the web with {availableSearchProviders.find(p => p.id === (activeSearchProvider || searchProvider))?.name || 'Web'}...
                                                 </span>
                                             </div>
                                         )}
@@ -266,17 +273,47 @@ export default function ChatInterface({
                 ) : (
                     <form className="input-container" onSubmit={handleSubmit}>
                         <div className="input-row-top">
-                            <label className={`search-toggle ${webSearch ? 'active' : ''}`} title="Toggle Web Search">
-                                <input
-                                    type="checkbox"
-                                    className="search-checkbox"
-                                    checked={webSearch}
-                                    onChange={() => setWebSearch(!webSearch)}
+                            <div className="search-provider-picker" ref={searchPopoverRef}>
+                                <button
+                                    type="button"
+                                    className={`search-toggle ${activeSearchProvider ? 'active' : ''}`}
+                                    onClick={() => !isLoading && setSearchPopoverOpen((v) => !v)}
                                     disabled={isLoading}
-                                />
-                                <span className="search-icon">🌐</span>
-                                {webSearch && <span className="search-label">Search On</span>}
-                            </label>
+                                    title={activeSearchProvider ? `Search: ${availableSearchProviders.find(p => p.id === activeSearchProvider)?.name || activeSearchProvider}` : 'Web Search Off'}
+                                    aria-haspopup="listbox"
+                                    aria-expanded={searchPopoverOpen}
+                                >
+                                    <span className="search-icon">🌐</span>
+                                    {activeSearchProvider && (
+                                        <span className="search-label">
+                                            {availableSearchProviders.find(p => p.id === activeSearchProvider)?.name || activeSearchProvider}
+                                        </span>
+                                    )}
+                                </button>
+                                {searchPopoverOpen && (
+                                    <div className="search-popover" role="listbox">
+                                        <button
+                                            type="button"
+                                            className={`search-popover-option ${!activeSearchProvider ? 'search-popover-option--selected' : ''}`}
+                                            onClick={() => { setActiveSearchProvider(null); setSearchPopoverOpen(false); }}
+                                        >
+                                            <span className="search-popover-option-icon">✕</span>
+                                            Off
+                                        </button>
+                                        {availableSearchProviders.map((p) => (
+                                            <button
+                                                key={p.id}
+                                                type="button"
+                                                className={`search-popover-option ${activeSearchProvider === p.id ? 'search-popover-option--selected' : ''}`}
+                                                onClick={() => { setActiveSearchProvider(p.id); setSearchPopoverOpen(false); }}
+                                            >
+                                                <span className="search-popover-option-icon">🌐</span>
+                                                {p.name}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
 
                             <textarea
                                 className="message-input"

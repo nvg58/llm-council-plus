@@ -3,7 +3,7 @@ import Sidebar from './components/Sidebar';
 import ChatInterface from './components/ChatInterface';
 import Settings from './components/Settings';
 import LandingPage from './components/LandingPage';
-import { api, DEFAULT_EXECUTION_MODE } from './api';
+import { api, DEFAULT_EXECUTION_MODE, buildAvailableSearchProviders } from './api';
 import './App.css';
 import './components/StageCopyButtons.css';
 import './ModeToggle.css';
@@ -24,10 +24,10 @@ function App() {
   const [councilModels, setCouncilModels] = useState([]);
   const [chairmanModel, setChairmanModel] = useState(null);
   const [searchProvider, setSearchProvider] = useState('duckduckgo');
+  const [availableSearchProviders, setAvailableSearchProviders] = useState([{ id: 'duckduckgo', name: 'DuckDuckGo' }]);
   const [executionMode, setExecutionMode] = useState(DEFAULT_EXECUTION_MODE);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [appMode, setAppMode] = useState(null); // null shows landing page
-  const [advisorState, setAdvisorState] = useState(null);
   const abortControllerRef = useRef(null);
   const advisorAbortControllerRef = useRef(null);
   const requestIdRef = useRef(0);
@@ -46,6 +46,8 @@ function App() {
       // Load execution mode preference
       setExecutionMode(settings.execution_mode || DEFAULT_EXECUTION_MODE);
       setSearchProvider(settings.search_provider || 'duckduckgo');
+
+      setAvailableSearchProviders(buildAvailableSearchProviders(settings));
 
       const hasApiKey = settings.openrouter_api_key_set ||
         settings.groq_api_key_set ||
@@ -111,6 +113,7 @@ function App() {
       setCouncilModels(models);
       setChairmanModel(chairman);
       setSearchProvider(settings.search_provider || 'duckduckgo');
+      setAvailableSearchProviders(buildAvailableSearchProviders(settings));
 
       const hasCouncilMembers = models.some(m => m && m.trim() !== '');
       const hasChairman = chairman && chairman.trim() !== '';
@@ -299,7 +302,6 @@ function App() {
         messages: [userMessage, debateMessage],
       });
 
-      setAdvisorState({ isRunning: true });
       advisorAbortControllerRef.current = new AbortController();
       setIsLoading(true);
 
@@ -405,7 +407,6 @@ function App() {
                 messages[messages.length - 1] = { ...lastMsg, isRunning: false };
                 return { ...prev, messages };
               });
-              setAdvisorState({ isRunning: false });
               setIsLoading(false);
               break;
 
@@ -420,7 +421,6 @@ function App() {
                 };
                 return { ...prev, messages };
               });
-              setAdvisorState({ isRunning: false });
               setIsLoading(false);
               break;
 
@@ -441,12 +441,10 @@ function App() {
           }
           return { ...prev, messages };
         });
-        setAdvisorState({ isRunning: false });
         setIsLoading(false);
         return;
       }
       console.error('Failed to start debate:', error);
-      setAdvisorState({ isRunning: false, error: error.message });
       setIsLoading(false);
     } finally {
       advisorAbortControllerRef.current = null;
@@ -454,7 +452,7 @@ function App() {
     }
   };
 
-  const handleSendMessage = async (content, webSearch) => {
+  const handleSendMessage = async (content, searchProvider) => {
     if (!currentConversationId) return;
 
     // Assign unique ID to this request to prevent race conditions
@@ -508,7 +506,7 @@ function App() {
       // Send message with streaming
       await api.sendMessageStream(
         currentConversationId,
-        { content, webSearch, executionMode },
+        { content, searchProvider, executionMode },
         (eventType, event) => {
           switch (eventType) {
             case 'search_start':
@@ -927,10 +925,11 @@ function App() {
             councilModels={councilModels}
             chairmanModel={chairmanModel}
             searchProvider={searchProvider}
+            availableSearchProviders={availableSearchProviders}
             onOpenSettings={handleOpenSettings}
             executionMode={executionMode}
             onExecutionModeChange={setExecutionMode}
-            mode={appMode || 'council'}
+            mode={appMode}
             onStartDebate={handleStartDebate}
           />
         )}

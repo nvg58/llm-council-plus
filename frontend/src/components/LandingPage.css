@@ -182,28 +182,23 @@
 }
 
 /* Gradient border line at top */
-.landing-card--council::before {
+.landing-card::before {
   content: '';
   position: absolute;
   top: 0;
   left: 10%;
   right: 10%;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.7), transparent);
   opacity: 0;
   transition: opacity 0.3s ease;
 }
 
+.landing-card--council::before {
+  background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.7), transparent);
+}
+
 .landing-card--advisors::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 10%;
-  right: 10%;
-  height: 1px;
   background: linear-gradient(90deg, transparent, rgba(139, 92, 246, 0.7), transparent);
-  opacity: 0;
-  transition: opacity 0.3s ease;
 }
 
 .landing-card:hover::before {

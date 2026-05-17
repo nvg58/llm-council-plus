@@ -35,6 +35,18 @@ export default function PromptSettings({
                 >
                     Stage 3
                 </button>
+                <button
+                    className={`prompt-tab ${activePromptTab === 'title' ? 'active' : ''}`}
+                    onClick={() => setActivePromptTab('title')}
+                >
+                    Title
+                </button>
+                <button
+                    className={`prompt-tab ${activePromptTab === 'query' ? 'active' : ''}`}
+                    onClick={() => setActivePromptTab('query')}
+                >
+                    Query
+                </button>
             </div>
 
             <div className="prompt-editor">
@@ -106,6 +118,36 @@ export default function PromptSettings({
                             rows={15}
                         />
                         <button className="reset-prompt-btn" onClick={() => handleResetPrompt('stage3_prompt')}>Reset to Default</button>
+                    </div>
+                )}
+                {activePromptTab === 'title' && (
+                    <div className="prompt-content">
+                        <label>Title Generation</label>
+                        <p className="section-description" style={{ marginBottom: '10px' }}>
+                            Guides the chairman model in generating a concise title for the conversation.
+                        </p>
+                        <p className="prompt-help">Variables: <code>{'{user_query}'}</code></p>
+                        <textarea
+                            value={prompts.title_prompt || ''}
+                            onChange={(e) => handlePromptChange('title_prompt', e.target.value)}
+                            rows={15}
+                        />
+                        <button className="reset-prompt-btn" onClick={() => handleResetPrompt('title_prompt')}>Reset to Default</button>
+                    </div>
+                )}
+                {activePromptTab === 'query' && (
+                    <div className="prompt-content">
+                        <label>Search Query Generation</label>
+                        <p className="section-description" style={{ marginBottom: '10px' }}>
+                            Guides the chairman model in extracting search terms from the user's question.
+                        </p>
+                        <p className="prompt-help">Variables: <code>{'{user_query}'}</code></p>
+                        <textarea
+                            value={prompts.query_prompt || ''}
+                            onChange={(e) => handlePromptChange('query_prompt', e.target.value)}
+                            rows={15}
+                        />
+                        <button className="reset-prompt-btn" onClick={() => handleResetPrompt('query_prompt')}>Reset to Default</button>
                     </div>
                 )}
             </div>

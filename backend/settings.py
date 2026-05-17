@@ -30,7 +30,8 @@ DEFAULT_DIRECT_PROVIDER_TOGGLES = {
     "google": False,
     "mistral": False,
     "deepseek": False,
-    "groq": False
+    "groq": False,
+    "nvidia": False,
 }
 
 
@@ -63,7 +64,9 @@ AVAILABLE_MODELS = [
 from .prompts import (
     STAGE1_PROMPT_DEFAULT,
     STAGE2_PROMPT_DEFAULT,
-    STAGE3_PROMPT_DEFAULT
+    STAGE3_PROMPT_DEFAULT,
+    TITLE_PROMPT_DEFAULT,
+    QUERY_PROMPT_DEFAULT
 )
 
 class Settings(BaseModel):
@@ -85,6 +88,7 @@ class Settings(BaseModel):
     mistral_api_key: Optional[str] = None
     deepseek_api_key: Optional[str] = None
     groq_api_key: Optional[str] = None
+    nvidia_api_key: Optional[str] = None
 
     # Ollama Settings
     ollama_base_url: str = "http://localhost:11434"
@@ -121,6 +125,8 @@ class Settings(BaseModel):
     stage1_prompt: str = STAGE1_PROMPT_DEFAULT
     stage2_prompt: str = STAGE2_PROMPT_DEFAULT
     stage3_prompt: str = STAGE3_PROMPT_DEFAULT
+    title_prompt: str = TITLE_PROMPT_DEFAULT
+    query_prompt: str = QUERY_PROMPT_DEFAULT
     
     # Execution Mode
     execution_mode: str = "full"  # Default execution mode: 'chat_only', 'chat_ranking', 'full'

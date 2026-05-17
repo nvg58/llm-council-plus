@@ -17,6 +17,15 @@ const getApiBase = () => {
 
 const API_BASE = getApiBase();
 
+export function buildAvailableSearchProviders(settings) {
+  const providers = [{ id: 'duckduckgo', name: 'DuckDuckGo' }];
+  if (settings.serper_api_key_set) providers.push({ id: 'serper', name: 'Serper (Google)' });
+  if (settings.tavily_api_key_set) providers.push({ id: 'tavily', name: 'Tavily' });
+  if (settings.brave_api_key_set) providers.push({ id: 'brave', name: 'Brave Search' });
+  if (settings.tinyfish_api_key_set) providers.push({ id: 'tinyfish', name: 'TinyFish' });
+  return providers;
+}
+
 export const DEFAULT_EXECUTION_MODE = 'full';
 
 export const api = {
@@ -324,6 +333,24 @@ export const api = {
     return response.json();
   },
 
+  async updatePersona(personaId, overrides) {
+    const response = await fetch(`${API_BASE}/api/personas/${personaId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(overrides),
+    });
+    if (!response.ok) throw new Error('Failed to update persona');
+    return response.json();
+  },
+
+  async resetPersona(personaId) {
+    const response = await fetch(`${API_BASE}/api/personas/${personaId}/override`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) throw new Error('Failed to reset persona');
+    return response.json();
+  },
+
   async sendDebateStream(conversationId, options, onEvent, signal) {
     const body = {
       question: options.question,
@@ -331,7 +358,7 @@ export const api = {
       model_assignments: options.modelAssignments || null,
       default_model: options.defaultModel || null,
       max_rounds: options.maxRounds || 2,
-      web_search: options.webSearch || false,
+      search_provider: options.searchProvider || null,
     };
 
     const response = await fetch(
@@ -392,7 +419,7 @@ export const api = {
    * @returns {Promise<void>}
    */
   async sendMessageStream(conversationId, options, onEvent, signal) {
-    const { content, webSearch = false, executionMode = 'full' } = options;
+    const { content, searchProvider = null, executionMode = 'full' } = options;
     const response = await fetch(
       `${API_BASE}/api/conversations/${conversationId}/message/stream?_t=${Date.now()}`,
       {
@@ -401,7 +428,7 @@ export const api = {
           'Content-Type': 'application/json',
           'Cache-Control': 'no-cache',
         },
-        body: JSON.stringify({ content, web_search: webSearch, execution_mode: executionMode }),
+        body: JSON.stringify({ content, search_provider: searchProvider, execution_mode: executionMode }),
         signal,
         cache: 'no-store',
       }

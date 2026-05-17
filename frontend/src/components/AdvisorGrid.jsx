@@ -19,17 +19,11 @@ export default function AdvisorGrid({
         {personas.map((persona) => {
           const isActive = persona.id === activePersonaId;
 
-          // thinking = currently speaking
-          // done = debate finished (not running, no active persona)
-          // waiting = debate running but not this persona's turn
-          // idle = before debate starts
           let cardState = 'idle';
           if (isActive) {
             cardState = 'thinking';
           } else if (isRunning) {
             cardState = 'waiting';
-          } else if (!isRunning && activePersonaId === null) {
-            cardState = 'idle';
           }
 
           return (
@@ -50,7 +44,6 @@ export default function AdvisorGrid({
                       style={{ borderColor: persona.color }}
                     />
                   )}
-                  {/* Show done badge only after debate has run (not running, and at least one round existed) */}
                   {!isRunning && !isActive && round > 1 && (
                     <div className="advisor-done-badge">✓</div>
                   )}

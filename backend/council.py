@@ -20,6 +20,7 @@ from .providers.openrouter import OpenRouterProvider
 from .providers.ollama import OllamaProvider
 from .providers.groq import GroqProvider
 from .providers.custom_openai import CustomOpenAIProvider
+from .providers.nvidia import NvidiaProvider
 
 # Initialize providers
 PROVIDERS = {
@@ -29,6 +30,7 @@ PROVIDERS = {
     "mistral": MistralProvider(),
     "deepseek": DeepSeekProvider(),
     "groq": GroqProvider(),
+    "nvidia": NvidiaProvider(),
     "openrouter": OpenRouterProvider(),
     "ollama": OllamaProvider(),
     "custom": CustomOpenAIProvider(),
@@ -547,7 +549,7 @@ async def generate_conversation_title(user_query: str) -> str:
     """
     Generate a short title for a conversation based on the first user message.
 
-    Uses a simple heuristic (first few words) to avoid unnecessary API calls.
+    Uses a fast LLM call (chairman) with customizable prompt.
 
     Args:
         user_query: The first user message
@@ -559,33 +561,77 @@ async def generate_conversation_title(user_query: str) -> str:
     if not user_query or not isinstance(user_query, str):
         return "Untitled Conversation"
 
-    # Simple heuristic: take first 50 chars
-    title = user_query.strip()
+    settings = get_settings()
+    try:
+        prompt_template = getattr(settings, 'title_prompt', None)
+        if not prompt_template:
+            from .prompts import TITLE_PROMPT_DEFAULT
+            prompt_template = TITLE_PROMPT_DEFAULT
+        prompt = prompt_template.format(user_query=user_query)
+    except Exception as e:
+        logger.warning(f"Error formatting title prompt: {e}. Using fallback.")
+        title = user_query.strip()
+        return title[:47] + "..." if len(title) > 50 else title
 
-    # If empty after stripping, return default
+    chairman_model = get_chairman_model()
+    messages = [{"role": "user", "content": prompt}]
+    
+    try:
+        response = await query_model(chairman_model, messages, temperature=0.3)
+        if response and not response.get('error'):
+            title = response.get('content', '').strip()
+            # Clean up quotes
+            title = title.strip('"\'')
+            if len(title) > 50:
+                title = title[:47] + "..."
+            if title:
+                return title
+    except Exception as e:
+        logger.error(f"Error generating title: {e}")
+
+    # Simple heuristic fallback
+    title = user_query.strip()
     if not title:
         return "Untitled Conversation"
-
-    # Remove quotes if present
     title = title.strip('"\'')
-
-    # Truncate if too long
     if len(title) > 50:
         title = title[:47] + "..."
-
     return title
 
 
-def generate_search_query(user_query: str) -> str:
-    """Return user query directly for web search (passthrough).
-    
-    Modern search engines (DuckDuckGo, Brave, Tavily) handle 
-    natural language queries well without optimization.
+async def generate_search_query(user_query: str) -> str:
+    """Generate search query from user query using the Chairman model.
     
     Args:
         user_query: The user's full question
     
     Returns:
-        User query truncated to 100 characters for safety
+        Search query truncated to 100 characters for safety
     """
-    return user_query[:100]  # Truncate for safety
+    settings = get_settings()
+    try:
+        prompt_template = getattr(settings, 'query_prompt', None)
+        if not prompt_template:
+            from .prompts import QUERY_PROMPT_DEFAULT
+            prompt_template = QUERY_PROMPT_DEFAULT
+        prompt = prompt_template.format(user_query=user_query)
+    except Exception as e:
+        logger.warning(f"Error formatting query prompt: {e}. Using fallback.")
+        return user_query[:100]
+
+    chairman_model = get_chairman_model()
+    messages = [{"role": "user", "content": prompt}]
+    
+    try:
+        response = await query_model(chairman_model, messages, temperature=0.1)
+        if response and not response.get('error'):
+            query = response.get('content', '').strip()
+            # Clean up quotes and conversational text if any leaked
+            query = query.strip('"\'')
+            if query:
+                return query[:100]
+    except Exception as e:
+        logger.error(f"Error generating search query: {e}")
+
+    return user_query[:100]  # Fallback to direct query
+

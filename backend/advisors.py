@@ -90,6 +90,17 @@ async def _query_advisor(
         return pid, model, None, str(e)
 
 
+async def _query_neutral(model: str, prompt: str, temperature: float = 0.3) -> Dict[str, Any]:
+    """Call a neutral (non-persona) model and return a normalized result dict."""
+    try:
+        response = await query_model(model, [{"role": "user", "content": prompt}], temperature=temperature)
+        if response.get("error"):
+            return {"model": model, "content": None, "error": response.get("error_message")}
+        return {"model": model, "content": response.get("content", ""), "error": None}
+    except Exception as e:
+        return {"model": model, "content": None, "error": str(e)}
+
+
 async def run_debate(
     question: str,
     persona_ids: List[str],
@@ -283,21 +294,7 @@ async def run_debate(
             question=question,
             transcript=transcript_text,
         )
-        try:
-            tb_response = await query_model(
-                tiebreaker_model,
-                [{"role": "user", "content": tiebreaker_prompt}],
-                temperature=0.3,
-            )
-            if tb_response.get("error"):
-                tiebreaker_result = {"model": tiebreaker_model, "content": None,
-                                     "error": tb_response.get("error_message")}
-            else:
-                tiebreaker_result = {"model": tiebreaker_model,
-                                     "content": tb_response.get("content", ""),
-                                     "error": None}
-        except Exception as e:
-            tiebreaker_result = {"model": tiebreaker_model, "content": None, "error": str(e)}
+        tiebreaker_result = await _query_neutral(tiebreaker_model, tiebreaker_prompt)
 
         yield {"type": "advisor_tiebreaker", "data": tiebreaker_result}
 
@@ -312,20 +309,7 @@ async def run_debate(
         verdict_prompt += f"\n\nTiebreaker ruling:\n{tiebreaker_result['content']}"
 
     verdict_model = settings.advisor_tiebreaker_model or default_model
-    try:
-        v_response = await query_model(
-            verdict_model,
-            [{"role": "user", "content": verdict_prompt}],
-            temperature=0.3,
-        )
-        if v_response.get("error"):
-            verdict_data = {"content": None, "model": verdict_model,
-                           "error": v_response.get("error_message")}
-        else:
-            verdict_data = {"content": v_response.get("content", ""),
-                           "model": verdict_model, "error": None}
-    except Exception as e:
-        verdict_data = {"content": None, "model": verdict_model, "error": str(e)}
+    verdict_data = await _query_neutral(verdict_model, verdict_prompt)
 
     yield {"type": "advisor_verdict", "data": verdict_data}
 

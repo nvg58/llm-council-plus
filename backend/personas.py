@@ -1,7 +1,12 @@
-"""Built-in advisor persona registry."""
+"""Built-in advisor persona registry with user override support."""
 
-from typing import List, Optional
+import json
+from pathlib import Path
+from typing import List, Optional, Dict, Any
 from pydantic import BaseModel
+
+_DATA_DIR = Path(__file__).parent.parent / "data"
+_OVERRIDES_FILE = _DATA_DIR / "persona_overrides.json"
 
 
 class Persona(BaseModel):
@@ -13,6 +18,7 @@ class Persona(BaseModel):
     system_prompt: str
     avatar_emoji: str
     color: str
+    is_customized: bool = False
 
 
 DEFAULT_PERSONAS: List[Persona] = [
@@ -167,20 +173,87 @@ DEFAULT_PERSONAS: List[Persona] = [
     ),
 ]
 
+_DEFAULT_MAP: Dict[str, Persona] = {p.id: p for p in DEFAULT_PERSONAS}
+
+_overrides_cache: Optional[Dict[str, Dict[str, Any]]] = None
+
+
+def _load_overrides() -> Dict[str, Dict[str, Any]]:
+    global _overrides_cache
+    if _overrides_cache is not None:
+        return _overrides_cache
+    if not _OVERRIDES_FILE.exists():
+        _overrides_cache = {}
+        return _overrides_cache
+    try:
+        _overrides_cache = json.loads(_OVERRIDES_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        _overrides_cache = {}
+    return _overrides_cache
+
+
+def _save_overrides(overrides: Dict[str, Dict[str, Any]]) -> None:
+    global _overrides_cache
+    _DATA_DIR.mkdir(parents=True, exist_ok=True)
+    _OVERRIDES_FILE.write_text(json.dumps(overrides, indent=2, ensure_ascii=False), encoding="utf-8")
+    _overrides_cache = overrides
+
+
+def _apply_override(base: Persona, override: Dict[str, Any]) -> Persona:
+    fields = base.model_dump()
+    for key in ("name", "role", "description", "system_prompt", "avatar_emoji"):
+        if key in override and override[key]:
+            fields[key] = override[key]
+    fields["is_customized"] = True
+    return Persona(**fields)
+
+
+def save_persona_override(persona_id: str, fields: Dict[str, Any]) -> Persona:
+    overrides = _load_overrides()
+    existing = overrides.get(persona_id, {})
+    existing.update({k: v for k, v in fields.items() if v is not None})
+    overrides[persona_id] = existing
+    _save_overrides(overrides)
+    base = _DEFAULT_MAP[persona_id]
+    return _apply_override(base, existing)
+
+
+def delete_persona_override(persona_id: str) -> Persona:
+    overrides = _load_overrides()
+    overrides.pop(persona_id, None)
+    _save_overrides(overrides)
+    return _DEFAULT_MAP[persona_id]
+
 
 def get_all_personas() -> List[Persona]:
-    return DEFAULT_PERSONAS
+    overrides = _load_overrides()
+    result = []
+    for p in DEFAULT_PERSONAS:
+        if p.id in overrides:
+            result.append(_apply_override(p, overrides[p.id]))
+        else:
+            result.append(p)
+    return result
 
 
 def get_persona(persona_id: str) -> Optional[Persona]:
-    for p in DEFAULT_PERSONAS:
-        if p.id == persona_id:
-            return p
-    return None
+    base = _DEFAULT_MAP.get(persona_id)
+    if not base:
+        return None
+    overrides = _load_overrides()
+    if persona_id in overrides:
+        return _apply_override(base, overrides[persona_id])
+    return base
 
 
 def get_personas_by_ids(persona_ids: List[str]) -> List[Persona]:
-    id_set = set(persona_ids)
-    found = [p for p in DEFAULT_PERSONAS if p.id in id_set]
-    found.sort(key=lambda p: persona_ids.index(p.id))
+    overrides = _load_overrides()
+    found = []
+    for pid in persona_ids:
+        base = _DEFAULT_MAP.get(pid)
+        if base:
+            if pid in overrides:
+                found.append(_apply_override(base, overrides[pid]))
+            else:
+                found.append(base)
     return found

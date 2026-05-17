@@ -1,16 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import AdvisorGrid from './AdvisorGrid';
 import './DebateView.css';
 
-// Find a persona by id from the personas array
+const toStr = (v) => (typeof v === 'string' ? v : String(v || ''));
+
 function findPersona(personas, id) {
   return personas.find((p) => p.id === id) || null;
 }
 
-// Round Section: shows one round's responses
 function RoundSection({ roundIndex, roundData, personas, isLast, isRunning }) {
-  // roundData.responses: array of { personaId, content, model, error }
   const responses = roundData.responses || [];
 
   return (
@@ -55,11 +54,7 @@ function RoundSection({ roundIndex, roundData, personas, isLast, isRunning }) {
                   </div>
                 ) : (
                   <div className="markdown-content">
-                    <ReactMarkdown>
-                      {typeof resp.content === 'string'
-                        ? resp.content
-                        : String(resp.content || '')}
-                    </ReactMarkdown>
+                    <ReactMarkdown>{toStr(resp.content)}</ReactMarkdown>
                   </div>
                 )}
               </div>
@@ -97,32 +92,22 @@ export default function DebateView({
 }) {
   const [verdictCopied, setVerdictCopied] = useState(false);
 
-  // Which persona is actively speaking right now?
-  // The parent sets this via the activePersonaId convention — if not provided
-  // as a direct prop, we infer it from the last incomplete response in the
-  // current round. AdvisorGrid just needs a string id or null.
-  const activePersonaId = isRunning
-    ? (() => {
-        const currentRoundData = rounds[currentRound - 1];
-        if (!currentRoundData) return null;
-        const responses = currentRoundData.responses || [];
-        // The last response is being streamed — show its persona as active
-        if (responses.length > 0) {
-          const last = responses[responses.length - 1];
-          if (!last.done) return last.personaId;
-        }
-        return null;
-      })()
-    : null;
+  const activePersonaId = useMemo(() => {
+    if (!isRunning) return null;
+    const currentRoundData = rounds[currentRound - 1];
+    if (!currentRoundData) return null;
+    const responses = currentRoundData.responses || [];
+    if (responses.length > 0) {
+      const last = responses[responses.length - 1];
+      if (!last.done) return last.personaId;
+    }
+    return null;
+  }, [isRunning, rounds, currentRound]);
 
   const handleCopyVerdict = async () => {
     if (!verdict?.content) return;
     try {
-      await navigator.clipboard.writeText(
-        typeof verdict.content === 'string'
-          ? verdict.content
-          : String(verdict.content)
-      );
+      await navigator.clipboard.writeText(toStr(verdict.content));
       setVerdictCopied(true);
       setTimeout(() => setVerdictCopied(false), 2000);
     } catch (err) {
@@ -187,11 +172,7 @@ export default function DebateView({
             )}
           </div>
           <div className="markdown-content">
-            <ReactMarkdown>
-              {typeof tiebreaker.content === 'string'
-                ? tiebreaker.content
-                : String(tiebreaker.content)}
-            </ReactMarkdown>
+            <ReactMarkdown>{toStr(tiebreaker.content)}</ReactMarkdown>
           </div>
         </div>
       )}
@@ -233,11 +214,7 @@ export default function DebateView({
             )}
           </div>
           <div className="debate-view__verdict-body markdown-content">
-            <ReactMarkdown>
-              {typeof verdict.content === 'string'
-                ? verdict.content
-                : String(verdict.content)}
-            </ReactMarkdown>
+            <ReactMarkdown>{toStr(verdict.content)}</ReactMarkdown>
           </div>
         </div>
       )}
