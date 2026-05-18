@@ -32,6 +32,8 @@ function App() {
   const advisorAbortControllerRef = useRef(null);
   const requestIdRef = useRef(0);
   const isInitialMount = useRef(true);
+  const conversationVersionRef = useRef(0);
+  const skipLoadForIdRef = useRef(null);
 
   // Check initial configuration on mount
   useEffect(() => {
@@ -188,7 +190,16 @@ function App() {
   // Load conversation details when selected
   useEffect(() => {
     if (currentConversationId) {
-      loadConversation(currentConversationId);
+      if (skipLoadForIdRef.current === currentConversationId) {
+        skipLoadForIdRef.current = null;
+        return;
+      }
+      // Capture the current version — if an optimistic update bumps it
+      // before the fetch resolves, the stale response is discarded.
+      // This is StrictMode-safe: double-invocation just fires two loads,
+      // both of which will be stale if a debate was started.
+      const versionAtStart = conversationVersionRef.current;
+      loadConversation(currentConversationId, versionAtStart);
     }
   }, [currentConversationId]);
 
@@ -205,10 +216,13 @@ function App() {
     }
   };
 
-  const loadConversation = async (id) => {
+  const loadConversation = async (id, expectedVersion) => {
     try {
       const conv = await api.getConversation(id);
-      setCurrentConversation(conv);
+      // Only apply if no newer optimistic update has occurred since we started
+      if (conversationVersionRef.current === expectedVersion) {
+        setCurrentConversation(conv);
+      }
     } catch (error) {
       console.error('Failed to load conversation:', error);
     }
@@ -273,22 +287,40 @@ function App() {
 
   const handleStartDebate = async (options) => {
     try {
+      // Clean up any existing empty conversation before creating a new one
+      const existingEmpty = conversations.find(conv => (!conv.title || conv.title === 'New Conversation') && conv.message_count === 0);
+      if (existingEmpty) {
+        try {
+          await api.deleteConversation(existingEmpty.id);
+          setConversations(prev => prev.filter(c => c.id !== existingEmpty.id));
+        } catch (e) {
+          console.error("Failed to cleanup empty conversation", e);
+        }
+      }
+
       const newConv = await api.createConversation({ mode: 'advisors' });
       const convId = newConv.id;
 
       setConversations((prev) => [
-        { id: convId, created_at: newConv.created_at, message_count: 0 },
+        { id: convId, created_at: newConv.created_at, message_count: 0, mode: 'advisors', title: 'New Conversation' },
         ...prev,
       ]);
+      // Bump version so any in-flight or upcoming loadConversation calls
+      // from the useEffect won't overwrite our optimistic state.
+      conversationVersionRef.current++;
+      skipLoadForIdRef.current = convId;
       setCurrentConversationId(convId);
+      setAppMode('advisors');
 
       const userMessage = { role: 'user', content: options.question };
       const debateMessage = {
         role: 'assistant',
         type: 'advisor_debate',
+        mode: 'advisors',
         isRunning: true,
         currentRound: 0,
         maxRounds: options.maxRounds || 2,
+        question: options.question,
         personas: [],
         rounds: [],
         verdict: null,
@@ -445,6 +477,20 @@ function App() {
         return;
       }
       console.error('Failed to start debate:', error);
+      // Surface the error to the user instead of showing a blank screen
+      setCurrentConversation((prev) => {
+        if (!prev?.messages?.length) return prev;
+        const messages = [...prev.messages];
+        const lastMsg = messages[messages.length - 1];
+        if (lastMsg.type === 'advisor_debate') {
+          messages[messages.length - 1] = {
+            ...lastMsg,
+            isRunning: false,
+            error: error.message || 'Failed to start debate. Please try again.',
+          };
+        }
+        return { ...prev, messages };
+      });
       setIsLoading(false);
     } finally {
       advisorAbortControllerRef.current = null;

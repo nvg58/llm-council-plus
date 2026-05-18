@@ -120,6 +120,19 @@ export default function AdvisorSetup({
     }
   };
 
+  const handleSimpleModelChange = async (modelId) => {
+    setChosenModel(modelId);
+    try {
+      const currentSettings = await api.getSettings();
+      await api.updateSettings({
+        ...currentSettings,
+        advisor_default_model: modelId
+      });
+    } catch (err) {
+      console.error('Failed to auto-save advisor default model:', err);
+    }
+  };
+
   const handleModelAssignment = (personaId, modelId) => {
     setModelAssignments((prev) => ({ ...prev, [personaId]: modelId }));
   };
@@ -416,7 +429,7 @@ export default function AdvisorSetup({
             <SearchableModelSelect
               models={models}
               value={chosenModel}
-              onChange={(id) => setChosenModel(id)}
+              onChange={handleSimpleModelChange}
               placeholder={modelsLoading ? 'Loading models…' : `Search ${models.length} models…`}
               isLoading={modelsLoading}
               isDisabled={modelsLoading}

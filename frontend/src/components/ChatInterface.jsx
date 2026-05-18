@@ -111,14 +111,14 @@ export default function ChatInterface({
         <div className="chat-interface">
             {/* Messages Area */}
             <div className="messages-area" ref={messagesContainerRef}>
-                {mode === 'advisors' && (!conversation || conversation.messages.length === 0) ? (
+                {mode === 'advisors' && conversation.messages.length === 0 ? (
                     <div className="advisor-setup-scroll">
                         <AdvisorSetup
                             onStartDebate={onStartDebate}
                             isLoading={isLoading}
                         />
                     </div>
-                ) : (!conversation || conversation.messages.length === 0) ? (
+                ) : (conversation.messages.length === 0) ? (
                     <div className="hero-container">
                         <div className="hero-content">
                             <h1>Welcome to LLM Council <span className="text-gradient">Plus</span></h1>
@@ -134,7 +134,9 @@ export default function ChatInterface({
                     conversation.messages.map((msg, index) => (
                         <div key={`${conversation.id}-msg-${index}`} className={`message ${msg.role}`}>
                             <div className="message-role">
-                                {msg.role === 'user' ? 'Your Question to the Council' : 'LLM Council'}
+                                {msg.role === 'user'
+                                    ? (mode === 'advisors' ? 'Your Question' : 'Your Question to the Council')
+                                    : (mode === 'advisors' ? 'Advisor Panel' : 'LLM Council')}
                             </div>
 
                             <div className="message-content">
@@ -152,6 +154,7 @@ export default function ChatInterface({
                                         maxRounds={msg.maxRounds || msg.metadata?.max_rounds || 2}
                                         isRunning={msg.isRunning || false}
                                         question={msg.question || ''}
+                                        error={msg.error || null}
                                     />
                                 ) : (
                                     <>
@@ -259,8 +262,8 @@ export default function ChatInterface({
                 <div ref={messagesEndRef} style={{ height: '20px' }} />
             </div>
 
-            {/* Floating Command Capsule */}
-            <div className="input-area">
+            {/* Floating Command Capsule — hidden for advisor debates */}
+            {mode !== 'advisors' && <div className="input-area">
                 {!councilConfigured ? (
                     <div className="input-container config-required">
                         <span className="config-message">
@@ -346,7 +349,7 @@ export default function ChatInterface({
                         </div>
                     </form>
                 )}
-            </div>
+            </div>}
         </div>
     );
 }

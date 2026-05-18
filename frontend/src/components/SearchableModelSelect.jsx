@@ -101,6 +101,10 @@ export default function SearchableModelSelect({
       boxShadow: '0 10px 40px rgba(0, 0, 0, 0.5)',
       zIndex: 100,
     }),
+    menuPortal: (base) => ({
+      ...base,
+      zIndex: 9999,
+    }),
     menuList: (base) => ({
       ...base,
       maxHeight: '300px',
@@ -192,6 +196,7 @@ export default function SearchableModelSelect({
       isClearable
       isSearchable
       styles={customStyles}
+      menuPortalTarget={document.body}
       classNamePrefix="model-select"
       noOptionsMessage={() => "No models found"}
       loadingMessage={() => "Loading models..."}

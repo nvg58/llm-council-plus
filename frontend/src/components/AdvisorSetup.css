@@ -60,6 +60,7 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
+  position: relative;
 }
 
 .advisor-setup__section-header {
@@ -701,6 +702,15 @@
   gap: 10px;
 }
 
+/* The config-row section must sit above sibling sections so the
+   search popover isn't clipped by the "Choose Advisors" card below */
+
+/* Lift the entire section containing the config-row above its siblings */
+.advisor-setup__section:has(.advisor-setup__config-row) {
+  z-index: 5;
+  overflow: visible;
+}
+
 .advisor-setup__search-btn {
   display: flex;
   align-items: center;
@@ -748,7 +758,7 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  z-index: 100;
+  z-index: 200;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
 }
 

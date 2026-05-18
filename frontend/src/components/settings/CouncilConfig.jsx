@@ -8,6 +8,7 @@ const DIRECT_PROVIDERS = [
     { id: 'google', name: 'Google', key: 'google_api_key' },
     { id: 'mistral', name: 'Mistral', key: 'mistral_api_key' },
     { id: 'deepseek', name: 'DeepSeek', key: 'deepseek_api_key' },
+    { id: 'nvidia', name: 'NVIDIA', key: 'nvidia_api_key' },
 ];
 
 export default function CouncilConfig({
@@ -62,6 +63,7 @@ export default function CouncilConfig({
             case 'google': return !!settings?.google_api_key_set;
             case 'mistral': return !!settings?.mistral_api_key_set;
             case 'deepseek': return !!settings?.deepseek_api_key_set;
+            case 'nvidia': return !!settings?.nvidia_api_key_set;
             default: return false;
         }
     };
@@ -178,7 +180,8 @@ export default function CouncilConfig({
                                                 anthropic: false,
                                                 google: false,
                                                 mistral: false,
-                                                deepseek: false
+                                                deepseek: false,
+                                                nvidia: false
                                             });
                                         }
                                     }}

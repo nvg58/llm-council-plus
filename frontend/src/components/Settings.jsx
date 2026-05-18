@@ -1002,7 +1002,8 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
         anthropic: false,
         google: false,
         mistral: false,
-        deepseek: false
+        deepseek: false,
+        nvidia: false
       });
 
       // 2. Reset Models to "Blank Slate" (User must select)
@@ -1049,7 +1050,8 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
           anthropic: false,
           google: false,
           mistral: false,
-          deepseek: false
+          deepseek: false,
+          nvidia: false
         },
         council_models: ['', ''],
         chairman_model: '',
@@ -1343,6 +1345,7 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
       case 'Google': return !!(directKeys.google_api_key || settings?.google_api_key_set);
       case 'Mistral': return !!(directKeys.mistral_api_key || settings?.mistral_api_key_set);
       case 'DeepSeek': return !!(directKeys.deepseek_api_key || settings?.deepseek_api_key_set);
+      case 'NVIDIA': return !!(directKeys.nvidia_api_key || settings?.nvidia_api_key_set);
       default: return false;
     }
   };

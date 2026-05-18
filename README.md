@@ -1,8 +1,6 @@
 # LLM Council Plus
 
-![LLM Council Plus](header.png)
-
-> **Collective AI Intelligence** — Instead of asking one LLM, convene a council of AI models that deliberate, peer-review, and synthesize the best answer.
+> **Collective AI Intelligence** — Convene a council of AI models that deliberate, peer-review, and synthesize the best answer — or assemble a panel of named advisor personas that debate your question and deliver a structured verdict.
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![React](https://img.shields.io/badge/React-19-61DAFB.svg)](https://reactjs.org/)
@@ -13,13 +11,12 @@
 
 ## What is LLM Council Plus?
 
-Instead of asking a single LLM (like ChatGPT or Claude) for an answer, **LLM Council Plus** assembles a council of multiple AI models that:
+LLM Council Plus is a **dual-mode multi-model AI deliberation system**. Instead of relying on a single LLM for answers, it orchestrates multiple models working together — either through anonymous peer review or persona-driven debate.
 
-1. **Independently answer** your question (Stage 1)
-2. **Anonymously peer-review** each other's responses (Stage 2)
-3. **Synthesize a final answer** through a Chairman model (Stage 3)
+**Choose your experience:**
 
-The result? More balanced, accurate, and thoroughly vetted responses that leverage the collective intelligence of multiple AI models.
+- **🏛️ LLM Council** — Multiple AI models independently answer your question, anonymously peer-review each other's responses, and a chairman model synthesizes the collective wisdom into a final answer.
+- **🎭 LLM Advisors** — Named advisor personas (The Skeptic, The Strategist, The Ethicist, etc.) debate your question across configurable rounds, reaching consensus or voting to deliver a structured verdict with an action plan.
 
 <p align="center">
   <div align="center">
@@ -53,133 +50,145 @@ Then open **http://localhost:5173** and configure your API keys in Settings.
 
 ---
 
-## How It Works
+## Two Modes of Deliberation
+
+### 🏛️ LLM Council — Multi-Model Deliberation
+
+The original three-stage pipeline where raw model diversity produces vetted answers:
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        YOUR QUESTION                             │
-│            (+ optional web search for real-time info)            │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    STAGE 1: DELIBERATION                         │
-│  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐             │
-│  │ Claude  │  │  GPT-4  │  │ Gemini  │  │  Llama  │  ...        │
-│  └────┬────┘  └────┬────┘  └────┬────┘  └────┬────┘             │
-│       │            │            │            │                   │
-│       ▼            ▼            ▼            ▼                   │
-│  Response A   Response B   Response C   Response D               │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    STAGE 2: PEER REVIEW                          │
-│  Each model reviews ALL responses (anonymized as A, B, C, D)     │
-│  and ranks them by accuracy, insight, and completeness           │
-│                                                                   │
-│  Rankings are aggregated to identify the best responses          │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    STAGE 3: SYNTHESIS                            │
-│  ┌─────────────────────────────────────────────────────────┐    │
-│  │                    CHAIRMAN MODEL                        │    │
-│  │  Reviews all responses + rankings + search context       │    │
-│  │  Synthesizes the council's collective wisdom             │    │
-│  └─────────────────────────────────────────────────────────┘    │
-│                              │                                   │
-│                              ▼                                   │
-│                      FINAL ANSWER                                │
-└─────────────────────────────────────────────────────────────────┘
+YOUR QUESTION (+ optional web search)
+         │
+         ▼
+  ┌─────────────────────────────────┐
+  │   STAGE 1: DELIBERATION         │
+  │   Claude, GPT-4, Gemini, Llama  │
+  │   Each answers independently    │
+  └──────────────┬──────────────────┘
+                 ▼
+  ┌─────────────────────────────────┐
+  │   STAGE 2: PEER REVIEW          │
+  │   Anonymized as A, B, C, D      │
+  │   Each model ranks all others   │
+  └──────────────┬──────────────────┘
+                 ▼
+  ┌─────────────────────────────────┐
+  │   STAGE 3: CHAIRMAN SYNTHESIS   │
+  │   Reviews all + rankings        │
+  │   Delivers the final answer     │
+  └─────────────────────────────────┘
 ```
+
+**Execution modes** control deliberation depth:
+
+| Mode | Stages | Best For |
+|------|--------|----------|
+| **Chat Only** | Stage 1 only | Quick responses, comparing model outputs |
+| **Chat + Ranking** | Stages 1 & 2 | Peer review without synthesis |
+| **Full Deliberation** | All 3 stages | Complete council synthesis (default) |
+
+### 🎭 LLM Advisors — Persona-Driven Debate
+
+A fundamentally different approach: named personas with distinct thinking styles argue your question in structured rounds.
+
+```
+YOUR QUESTION (+ optional web search)
+         │
+         ▼
+  ┌─────────────────────────────────┐
+  │   ROUND 1: OPENING POSITIONS    │
+  │   Each advisor states their case │
+  └──────────────┬──────────────────┘
+                 ▼
+  ┌─────────────────────────────────┐
+  │   ROUND 2–N: DEBATE             │
+  │   Rotating order, respond to    │
+  │   each other by name            │
+  │   (auto-stops on consensus)     │
+  └──────────────┬──────────────────┘
+                 ▼
+  ┌─────────────────────────────────┐
+  │   VERDICT (or TIEBREAKER)       │
+  │   Summary, consensus points,    │
+  │   disagreements table, verdict, │
+  │   next steps, open questions    │
+  └─────────────────────────────────┘
+```
+
+**10 built-in advisor personas:**
+
+| Persona | Role | Style |
+|---------|------|-------|
+| 🔍 **The Skeptic** | Critical Thinker | Challenges assumptions, demands evidence |
+| 🔧 **The Pragmatist** | Practical Advisor | Focuses on feasibility and real-world constraints |
+| 💡 **The Innovator** | Creative Thinker | Pushes boundaries, explores unconventional solutions |
+| 📜 **The Historian** | Pattern Analyst | Draws lessons from historical patterns |
+| ⚖️ **The Ethicist** | Moral Compass | Examines decisions through ethics and fairness |
+| 📊 **The Data Analyst** | Evidence Evaluator | Brings quantitative rigor and measurable evidence |
+| 🎭 **The Contrarian** | Devil's Advocate | Deliberately argues the opposing position |
+| ♟️ **The Strategist** | Big-Picture Thinker | Thinks long-term about positioning and leverage |
+| 🤝 **The Humanist** | People-First Advocate | Centers the human experience and well-being |
+| 🛡️ **The Risk Assessor** | Risk Analyst | Identifies worst-case scenarios and mitigations |
+
+All personas are **fully customizable** — edit name, role, description, system prompt, and emoji. Changes persist across sessions with per-persona reset to defaults.
 
 ---
 
 ## Features
 
 ### Multi-Provider Support
-Mix and match models from different sources in your council:
+
+Mix and match models from 10 different provider types:
 
 | Provider | Type | Description |
 |----------|------|-------------|
 | **OpenRouter** | Cloud | 100+ models via single API (GPT-4, Claude, Gemini, Mistral, etc.) |
 | **Ollama** | Local | Run open-source models locally (Llama, Mistral, Phi, etc.) |
 | **Groq** | Cloud | Ultra-fast inference for Llama and Mixtral models |
+| **NVIDIA NIM** | Cloud | NVIDIA Build models via `integrate.api.nvidia.com` |
 | **OpenAI Direct** | Cloud | Direct connection to OpenAI API |
 | **Anthropic Direct** | Cloud | Direct connection to Anthropic API |
 | **Google Direct** | Cloud | Direct connection to Google AI API |
 | **Mistral Direct** | Cloud | Direct connection to Mistral API |
 | **DeepSeek Direct** | Cloud | Direct connection to DeepSeek API |
-| **Custom Endpoint** | Any | Connect to any OpenAI-compatible API (Together AI, Fireworks, vLLM, LM Studio, GitHub Models, etc.) |
-
-<p align="center">
-  <img width="600" alt="LLM API Keys Settings" src="https://github.com/user-attachments/assets/f9a5ec9d-17e8-4e78-ad40-0c21850f2823" />
-</p>
-
-### Execution Modes
-
-<p align="center">
-  <img width="818" alt="Execution Modes Toggle" src="https://github.com/user-attachments/assets/6f8dcc5b-6dbb-423a-8376-9f6b0ebb58ba" />
-</p>
-
-Choose how deeply the council deliberates:
-
-| Mode | Stages | Best For |
-|------|--------|----------|
-| **Chat Only** | Stage 1 only | Quick responses, comparing model outputs |
-| **Chat + Ranking** | Stages 1 & 2 | See how models rank each other |
-| **Full Deliberation** | All 3 stages | Complete council synthesis (default) |
+| **Custom Endpoint** | Any | Any OpenAI-compatible API (Together AI, Fireworks, vLLM, LM Studio, GitHub Models, etc.) |
 
 ### Web Search Integration
 
-<p align="center">
-  <img width="841" alt="Web Search Settings" src="https://github.com/user-attachments/assets/ae0d8f30-8a0d-4ae2-924b-3de75e9102e1" />
-</p>
-
-Ground your council's responses in real-time information:
+Ground your council's or advisors' responses in real-time information:
 
 | Provider | Type | Notes |
 |----------|------|-------|
 | **DuckDuckGo** | Free | Hybrid web+news search, no API key needed |
+| **TinyFish** | Free | Batch Fetch API for fast multi-URL fetching |
 | **Serper** | API Key | Real Google results, 2,500 free queries |
 | **Tavily** | API Key | Purpose-built for LLMs, rich content |
 | **Brave Search** | API Key | Privacy-focused, 2,000 free queries/month |
 
-**Full Article Fetching**: Uses [Jina Reader](https://jina.ai/reader) to extract full article content from top search results (configurable 0-10 results).
+**Full Article Fetching**: Uses [Jina Reader](https://jina.ai/reader) to extract full article content from top search results (configurable 0–10 results).
 
 ### Temperature Controls
 
-<p align="center">
-  <img width="586" alt="Temperature Controls" src="https://github.com/user-attachments/assets/3922edf6-99f5-4020-b80f-ba3c43a2ce9a" />
-</p>
+Fine-tune creativity vs consistency per stage:
 
-Fine-tune creativity vs consistency:
-
-- **Council Heat**: Controls Stage 1 response creativity (default: 0.5)
-- **Chairman Heat**: Controls final synthesis creativity (default: 0.4)
-- **Stage 2 Heat**: Controls peer ranking consistency (default: 0.3)
-
-<p align="center">
-  <img width="849" alt="Council Configuration" src="https://github.com/user-attachments/assets/45880bee-1fec-4efc-b1cb-eceaabe071ff" />
-</p>
+- **Council Heat**: Stage 1 response creativity (default: 0.5)
+- **Chairman Heat**: Final synthesis creativity (default: 0.4)
+- **Stage 2 Heat**: Peer ranking consistency (default: 0.3)
 
 ### Additional Features
 
-- **Live Progress Tracking**: See each model respond in real-time
-- **Council Sizing**: adjust council size from 2 to 8
-- **Abort Anytime**: Cancel in-progress requests
-- **Conversation History**: All conversations saved locally
-- **Customizable Prompts**: Edit Stage 1, 2, and 3 system prompts
-- **Rate Limit Warnings**: Alerts when your config may hit API limits (when >5 council members)
-- **"I'm Feeling Lucky"**: Randomize your council composition
-- **Import & Export**:  backup and share your favorite council configurations, system prompts, and settings
-
-<p align="center">
-  <img width="854" alt="Backup and Reset" src="https://github.com/user-attachments/assets/0e618bd4-02c2-47b2-b82b-c4900b7a4fdd" />
-</p>
-
+- **Live Progress Tracking** — See each model or advisor respond in real-time with streaming
+- **Multi-turn Conversations** — Follow-up questions carry full context automatically
+- **Council Sizing** — Adjust council from 1 to 8 models; advisors from 2 to 4 personas
+- **Abort Anytime** — Cancel in-progress requests
+- **Conversation History** — All conversations saved locally with search
+- **Customizable System Prompts** — Edit Stage 1, 2, and 3 prompts for Council mode
+- **Rate Limit Warnings** — Alerts when your config may hit API limits
+- **"I'm Feeling Lucky"** — Randomize your council composition
+- **Import & Export** — Backup and share your settings, API keys, and prompts
+- **Per-request Model Overrides** — Use different models for individual requests without changing global config
+- **One-shot API** — `POST /api/ask` for scripts and MCP agents (no conversation state)
+- **Docker Deployment** — Single-container production deployment via `docker compose`
 
 ---
 
@@ -205,12 +214,6 @@ Terminal 1 (Backend):
 uv run python -m backend.main
 ```
 
-By default, the manual backend launcher binds to `127.0.0.1:8001`. To expose it on your local network, set:
-
-```bash
-LLM_COUNCIL_BIND_HOST=0.0.0.0 uv run python -m backend.main
-```
-
 Terminal 2 (Frontend):
 ```bash
 cd frontend
@@ -221,47 +224,76 @@ Then open **http://localhost:5173** in your browser.
 
 ### Docker / VPS Deployment
 
-Build and run the app as a single container:
-
 ```bash
 docker compose up -d --build
 ```
 
-Then open **http://YOUR_SERVER_IP:8001**. Conversations and settings are persisted to `./data` on the host automatically.
+Then open **http://YOUR_SERVER_IP:8001**. Conversations and settings persist to `./data` automatically.
 
-For Ollama, reverse proxy setup, environment variables, and upgrade instructions, see **[docs/DOCKER.md](docs/DOCKER.md)**.
+For Ollama integration, reverse proxy setup, environment variables, and upgrade instructions, see **[docs/DOCKER.md](docs/DOCKER.md)**.
 
 ### Network Access
 
-The application is configured to be accessible from other devices on your local network.
+The start script exposes both frontend and backend on the network automatically:
 
-**Using start.sh (automatic):**
-The start script exposes both frontend and backend on the network automatically. Just run `./start.sh` and access from any device. It sets `LLM_COUNCIL_BIND_HOST=0.0.0.0` for the backend unless you override that environment variable.
-
-**Access URLs:**
 - **Local:** `http://localhost:5173`
-- **Network:** `http://YOUR_IP:5173` (e.g., `http://192.168.1.100:5173`)
+- **Network:** `http://YOUR_IP:5173`
 
-**Find your network IP:**
-```bash
-# macOS/Linux
-ifconfig | grep "inet " | grep -v 127.0.0.1
-
-# Or use hostname
-hostname -I
-```
-
-**Manual setup (if not using start.sh):**
+For manual setup:
 ```bash
 # Backend with network access
 LLM_COUNCIL_BIND_HOST=0.0.0.0 uv run python -m backend.main
 
 # Frontend with network access
-cd frontend
-npm run dev -- --host
+cd frontend && npm run dev -- --host
 ```
 
-The frontend automatically detects the hostname and connects to the backend on the same IP. When running via `./start.sh`, CORS is configured to allow requests from any hostname on ports 5173 and 3000. Remote settings export/import/reset still require `LLM_COUNCIL_ADMIN_TOKEN`; without it, those admin endpoints only accept direct loopback clients. When running via Docker, the frontend and API share the same origin so no external CORS is needed.
+Remote admin endpoints (`/api/settings/export`, `/api/settings/import`, `/api/settings/reset`) require `LLM_COUNCIL_ADMIN_TOKEN` when accessed by proxied or remote clients.
+
+---
+
+## Configuration
+
+### First-Time Setup
+
+On first launch, configure at least one LLM provider in Settings:
+
+1. **LLM API Keys** — Enter API keys for your chosen providers
+2. **Council Config** — Select council members and chairman
+3. **Save Changes**
+
+API keys **auto-save** when you click "Test" and the connection succeeds.
+
+### LLM API Keys
+
+| Provider | Get API Key |
+|----------|-------------|
+| OpenRouter | [openrouter.ai/keys](https://openrouter.ai/keys) |
+| Groq | [console.groq.com/keys](https://console.groq.com/keys) |
+| NVIDIA | [build.nvidia.com](https://build.nvidia.com/) |
+| OpenAI | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) |
+| Anthropic | [console.anthropic.com](https://console.anthropic.com/) |
+| Google AI | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) |
+| Mistral | [console.mistral.ai/api-keys](https://console.mistral.ai/api-keys/) |
+| DeepSeek | [platform.deepseek.com](https://platform.deepseek.com/) |
+
+### Ollama (Local Models)
+
+1. Install [Ollama](https://ollama.com/)
+2. Pull models: `ollama pull llama3.1`
+3. Start Ollama: `ollama serve`
+4. In Settings, enter your Ollama URL (default: `http://localhost:11434`)
+5. Click "Connect" to verify
+
+### Custom OpenAI-Compatible Endpoint
+
+Connect to any OpenAI-compatible API:
+
+1. Go to **LLM API Keys** → **Custom OpenAI-Compatible Endpoint**
+2. Enter **Display Name**, **Base URL**, and **API Key** (optional for local servers)
+3. Click "Connect" to test and save
+
+**Compatible services**: Together AI, Fireworks AI, vLLM, LM Studio, GitHub Models, and more.
 
 ---
 
@@ -283,132 +315,15 @@ See [docs/mcp/](docs/mcp/) for full setup guides, including remote server and SS
 
 ## Claude Code Skill (No MCP Required)
 
-If MCP isn't available or you prefer direct HTTP access, install the **`llm-council-api` skill** for Claude Code. It teaches Claude how to interact with the Council's REST API directly — configure models, run deliberations, parse SSE streams, and troubleshoot — without the MCP server.
+If MCP isn't available or you prefer direct HTTP access, install the **`llm-council-api` skill** for Claude Code:
 
-**Install:**
 ```bash
-# Option 1: symlink from your cloned repo
+# Symlink from your cloned repo
 mkdir -p ~/.claude/skills
 ln -s "$(pwd)/skills/llm-council-api" ~/.claude/skills/llm-council-api
-
-# Option 2: download directly
-mkdir -p ~/.claude/skills/llm-council-api
-curl -o ~/.claude/skills/llm-council-api/SKILL.md \
-  https://raw.githubusercontent.com/jacob-bd/llm-council-plus/main/skills/llm-council-api/SKILL.md
 ```
 
-Once installed, Claude Code automatically loads it when you ask about council operations. The skill covers all 8 API endpoints, SSE stream parsing, error handling, and troubleshooting. See [`skills/llm-council-api/SKILL.md`](skills/llm-council-api/SKILL.md) for the full reference.
-
----
-
-## Configuration
-
-### First-Time Setup
-
-On first launch, the Settings panel will open automatically. Configure at least one LLM provider:
-
-1. **LLM API Keys** tab: Enter API keys for your chosen providers
-2. **Council Config** tab: Select council members and chairman
-3. **Save Changes**
-
-### LLM API Keys
-
-| Provider | Get API Key |
-|----------|-------------|
-| OpenRouter | [openrouter.ai/keys](https://openrouter.ai/keys) |
-| Groq | [console.groq.com/keys](https://console.groq.com/keys) |
-| OpenAI | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) |
-| Anthropic | [console.anthropic.com](https://console.anthropic.com/) |
-| Google AI | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) |
-| Mistral | [console.mistral.ai/api-keys](https://console.mistral.ai/api-keys/) |
-| DeepSeek | [platform.deepseek.com](https://platform.deepseek.com/) |
-
-**API keys are auto-saved** when you click "Test" and the connection succeeds.
-
-### Ollama (Local Models)
-
-1. Install [Ollama](https://ollama.com/)
-2. Pull models: `ollama pull llama3.1`
-3. Start Ollama: `ollama serve`
-4. In Settings, enter your Ollama URL (default: `http://localhost:11434`)
-5. Click "Connect" to verify
-
-### Custom OpenAI-Compatible Endpoint
-
-Connect to any OpenAI-compatible API:
-
-1. Go to **LLM API Keys** → **Custom OpenAI-Compatible Endpoint**
-2. Enter:
-   - **Display Name**: e.g., "Together AI", "My vLLM Server"
-   - **Base URL**: e.g., `https://api.together.xyz/v1`
-   - **API Key**: (optional for local servers)
-3. Click "Connect" to test and save
-
-**Compatible services**: Together AI, Fireworks AI, vLLM, LM Studio, Ollama (if you prefer this method), GitHub Models (`https://models.inference.ai.azure.com/v1`), and more.
-
-### Council Configuration
-
-1. **Enable Model Sources**: Toggle which providers appear in model selection
-2. **Select Council Members**: Choose 2-8 models for your council
-3. **Select Chairman**: Pick a model to synthesize the final answer
-4. **Adjust Temperature**: Use sliders for creativity control
-
-**Tips:**
-- Mix different model families for diverse perspectives
-- Use faster models (Groq, Ollama) for large councils
-- Free OpenRouter models have rate limits (20/min, 50/day)
-
-### Search Providers
-
-| Provider | Setup |
-|----------|-------|
-| DuckDuckGo | Works out of the box, no setup needed |
-| TinyFish | Free tier, no API key required. Uses batch Fetch API for fast multi-URL fetching. |
-| Serper | Get key at [serper.dev](https://serper.dev), enter in Search Providers tab |
-| Tavily | Get key at [tavily.com](https://tavily.com), enter in Search Providers tab |
-| Brave | Get key at [brave.com/search/api](https://brave.com/search/api/), enter in Search Providers tab |
-
-**Search Query Processing:**
-
-| Mode | Description | Best For |
-|------|-------------|----------|
-| **Direct** (default) | Sends your exact query to the search engine | Short, focused questions. Works best with semantic search engines like Tavily and Brave. |
-| **Smart Keywords (YAKE)** | Extracts key terms from your prompt before searching | Very long prompts or multi-paragraph context that might confuse the search engine. Uses [YAKE](https://github.com/LIAAD/yake) keyword extraction. |
-
-> **Tip:** Start with **Direct** mode. Only switch to **YAKE** if you notice search results are irrelevant when pasting long documents or complex prompts.
-
----
-
-## Usage
-
-### Basic Usage
-
-1. Start a new conversation (+ button in sidebar)
-2. Type your question
-3. (Optional) Enable web search toggle for real-time info
-4. Press Enter or click Send
-
-### Understanding the Output
-
-**Stage 1 - Council Deliberation**
-- Tab view showing each model's individual response
-- Live progress as models respond
-
-**Stage 2 - Peer Rankings**
-- Each model's evaluation and ranking of peers
-- Aggregate scores showing consensus rankings
-- De-anonymization reveals which model gave which response
-
-**Stage 3 - Chairman Synthesis**
-- Final, synthesized answer from the Chairman
-- Incorporates best insights from all responses and rankings
-
-### Keyboard Shortcuts
-
-| Key | Action |
-|-----|--------|
-| `Enter` | Send message |
-| `Shift+Enter` | New line in input |
+The skill covers all API endpoints, SSE stream parsing, advisor endpoints, and troubleshooting. See [`skills/llm-council-api/SKILL.md`](skills/llm-council-api/SKILL.md) for the full reference.
 
 ---
 
@@ -430,8 +345,9 @@ All data is stored locally in the `data/` directory:
 
 ```
 data/
-├── settings.json          # Your configuration (includes API keys)
-└── conversations/         # Conversation history
+├── settings.json              # Configuration (includes API keys)
+├── persona_overrides.json     # Advisor persona customizations
+└── conversations/             # Conversation history
     ├── {uuid}.json
     └── ...
 ```
@@ -440,23 +356,18 @@ data/
 
 > **⚠️ Security Warning: API Keys Stored in Plain Text**
 >
-> In this build, **API keys are stored in clear text** in `data/settings.json`. The `data/` folder is included in `.gitignore` by default to prevent accidental exposure.
+> API keys are stored in clear text in `data/settings.json`. The `data/` folder is included in `.gitignore` by default.
 >
-> **Important:**
-> - **Do NOT remove `data/` from `.gitignore`** — this protects your API keys from being pushed to GitHub
-> - If you fork this repo or modify `.gitignore`, ensure `data/` remains ignored
+> - **Do NOT remove `data/` from `.gitignore`**
 > - Never commit `data/settings.json` to version control
-> - If you accidentally expose your keys, rotate them immediately at each provider's dashboard
+> - If you accidentally expose your keys, rotate them immediately
 
 ---
 
 ## Troubleshooting
 
-### Common Issues
-
 **"Failed to load conversations"**
-- Backend might still be starting up
-- App retries automatically (3 attempts with 1s, 2s, 3s delays)
+- Backend might still be starting up — the app retries automatically
 
 **Models not appearing in dropdown**
 - Ensure the provider is enabled in Council Config
@@ -470,7 +381,6 @@ data/
 **Rate limit errors (OpenRouter)**
 - Free models: 20 requests/min, 50/day
 - Consider using Groq (14,400/day) or Ollama (unlimited)
-- Reduce council size for free tier usage
 
 **Binary compatibility errors (node_modules)**
 - When syncing between Intel/Apple Silicon Macs:
@@ -478,10 +388,9 @@ data/
   rm -rf frontend/node_modules && cd frontend && npm install
   ```
 
-### Logs
-
-- **Backend logs**: Terminal running `uv run python -m backend.main`
-- **Frontend logs**: Browser DevTools console
+**Logs:**
+- Backend: Terminal running `uv run python -m backend.main`
+- Frontend: Browser DevTools console
 
 ---
 
@@ -489,14 +398,7 @@ data/
 
 This project is a fork and enhancement of the original **[llm-council](https://github.com/karpathy/llm-council)** by **[Andrej Karpathy](https://github.com/karpathy)**.
 
-**LLM Council Plus** builds upon the original "vibe coded" foundation with:
-- Multi-provider support (OpenRouter, Ollama, Groq, Direct APIs, Custom endpoints)
-- Web search integration (DuckDuckGo, Tavily, Brave + Jina Reader)
-- Execution modes (Chat Only, Chat + Ranking, Full Deliberation)
-- Temperature controls for all stages
-- Enhanced Settings UI with import/export
-- Real-time streaming with progress tracking
-- And much more...
+**LLM Council Plus** builds upon the original foundation with dual-mode deliberation (Council + Advisors), 10 provider integrations (including NVIDIA NIM), web search, persona-driven debates, customizable prompts, an MCP server, Docker deployment, and much more.
 
 We gratefully acknowledge Andrej Karpathy for the original inspiration and codebase.
 
@@ -504,17 +406,17 @@ We gratefully acknowledge Andrej Karpathy for the original inspiration and codeb
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
+MIT License — see [LICENSE](LICENSE) for details.
 
 ---
 
 ## Contributing
 
-Contributions are welcome! This project embraces the spirit of "vibe coding" - feel free to fork and make it your own.
+Contributions are welcome! This project embraces the spirit of "vibe coding" — feel free to fork and make it your own.
 
 ---
 
 <p align="center">
   <strong>Built with the collective wisdom of AI</strong><br>
-  <em>Ask the council. Get better answers.</em>
+  <em>Ask the council. Debate with advisors. Get better answers.</em>
 </p>

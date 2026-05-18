@@ -89,6 +89,7 @@ export default function DebateView({
   maxRounds = 3,
   isRunning = false,
   question = '',
+  error = null,
 }) {
   const [verdictCopied, setVerdictCopied] = useState(false);
 
@@ -142,6 +143,17 @@ export default function DebateView({
         <div className="debate-view__starting">
           <span className="debate-view__starting-spinner" aria-hidden="true" />
           Debate starting...
+        </div>
+      )}
+
+      {/* Error banner — shown when the debate fails */}
+      {error && (
+        <div className="debate-view__error">
+          <span className="debate-view__error-icon">⚠️</span>
+          <div className="debate-view__error-content">
+            <strong>Debate failed</strong>
+            <p>{error}</p>
+          </div>
         </div>
       )}
 

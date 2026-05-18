@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-05-18
+
+### Added
+- **LLM Advisors mode**: Entirely new persona-driven debate system where named advisor personas argue your question across configurable rounds, reaching consensus or voting to deliver a structured verdict with action plan
+- **10 built-in advisor personas**: The Skeptic, The Pragmatist, The Innovator, The Historian, The Ethicist, The Data Analyst, The Contrarian, The Strategist, The Humanist, and The Risk Assessor — each with unique system prompts, roles, emoji avatars, and color-coded identities
+- **Persona customization**: Edit any persona's name, role, description, system prompt, and avatar emoji — overrides persist to `data/persona_overrides.json` with per-persona reset to defaults
+- **Debate orchestration** (`backend/advisors.py`): Multi-round debate engine with rotating speaking order, consensus detection via `CONSENSUS:YES/NO` tags, automatic early termination on agreement, and tiebreaker invocation when advisors remain split
+- **Structured verdict system**: Neutral analyst synthesizes debate transcript into Summary, Consensus Points, Disagreements table, Verdict, Recommended Next Steps, and Open Uncertainties
+- **NVIDIA NIM provider** (`backend/providers/nvidia.py`): Native support for NVIDIA Build (NIM) models at `integrate.api.nvidia.com/v1` with `nvidia:` prefix routing, API key management, and model listing
+- **Landing page** (`LandingPage.jsx`, `LandingPage.css`): New dual-mode entry screen with animated glass cards for "Enter Council" and "Start Advisory Session", custom SVG icons, gradient orbs, and grid background
+- **Advisor Setup UI** (`AdvisorSetup.jsx`, `AdvisorSetup.css`): Full configuration panel with question input, model selection via `SearchableModelSelect`, round count slider, web search toggle, persona selection grid with inline editing, and glassmorphic styling
+- **Debate View UI** (`DebateView.jsx`, `DebateView.css`): Live debate display with per-round sections, persona-colored response cards, consensus banners, tiebreaker section, verdict panel with copy-to-clipboard, and streaming progress indicators
+- **Advisor Grid** (`AdvisorGrid.jsx`, `AdvisorGrid.css`): Visual grid showing active debate participants with round progress and active-speaker highlighting
+- **Advisor API endpoints**: `POST /api/advisor/debate/stream` (SSE streaming debate), `GET /api/personas` (list all personas), `PATCH /api/personas/{id}` (save overrides), `DELETE /api/personas/{id}/override` (reset to default)
+- **Advisor conversation persistence**: `add_advisor_message()` in storage saves full debate transcripts (rounds, verdict, tiebreaker, persona IDs) alongside existing council conversations
+- **Advisor settings**: `advisor_default_model` and `advisor_default_rounds` fields in settings with validation (1–10 rounds, 2–4 advisors per debate)
+- **NVIDIA SVG icon** (`frontend/src/assets/icons/nvidia.svg`) with provider detection in `CouncilGrid.jsx`
+
+### Changed
+- **App architecture**: `App.jsx` refactored to support dual-mode routing — landing page → council mode or advisors mode, with independent state management for each
+- **Sidebar**: Updated to show mode-aware conversation list with Home button navigation back to landing page
+- **`SearchableModelSelect`**: Now normalizes dashes to spaces during search so NVIDIA model names (e.g., `nvidia/llama-3.1-nemotron-ultra-253b-v1`) match correctly
+- **CouncilGrid provider detection**: NVIDIA prefix (`nvidia:`) added to provider icon lookup chain
+- **Settings UI**: NVIDIA API key section added to Provider Settings with test/save flow
+- **`ChatInterface`**: Extended to support both council and advisor question submission flows
+- **`llm-council-api` skill updated to v1.0.0**: Documents advisor endpoints, persona API, NVIDIA provider, and dual-mode architecture
+
 ## [0.4.2] - 2026-05-15
 
 ### Added
