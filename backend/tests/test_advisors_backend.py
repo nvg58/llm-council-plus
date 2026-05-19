@@ -205,8 +205,6 @@ async def test_run_debate_tiebreaker_skipped_for_three_personas():
 @pytest.mark.asyncio
 async def test_run_debate_one_advisor_error_round_still_completes():
     """One persona errors per round; others succeed. Round still emits round_complete."""
-    call_count = {"n": 0}
-
     async def flaky_advisor(pid, prompt, personas_map, model_assignments, default_model, temperature):
         if pid == "skeptic":
             return pid, default_model, None, "Timeout"
@@ -233,8 +231,6 @@ async def test_run_debate_one_advisor_error_round_still_completes():
 @pytest.mark.asyncio
 async def test_run_debate_round_order_rotates():
     """Round 1 uses original order; round 2 shifts left by 1."""
-    seen_orders: list[list[str]] = []
-
     async def recording_advisor(pid, prompt, personas_map, model_assignments, default_model, temperature):
         return pid, default_model, "Answer. CONSENSUS:NO", None
 

@@ -273,7 +273,7 @@ async def buffer_debate(events: AsyncIterator[dict], conversation_id: str) -> di
             },
         }
 
-    verdict_model = verdict.get("model", "unknown") if verdict else "unknown"
+    verdict_model = verdict.get("model", "unknown")
     return {
         "conversation_id": conversation_id,
         "question": question,

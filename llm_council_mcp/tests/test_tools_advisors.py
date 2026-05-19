@@ -9,20 +9,12 @@ import pytest
 import respx
 
 from llm_council_mcp.server import create_server
+from llm_council_mcp.tests.conftest import get_json, get_text
 
 
 @pytest.fixture
 def server():
     return create_server(base_url="http://test:8001")
-
-
-def get_text(call_tool_result) -> str:
-    content_blocks, _ = call_tool_result
-    return content_blocks[0].text
-
-
-def get_json(call_tool_result) -> dict | list:
-    return json.loads(get_text(call_tool_result))
 
 
 PERSONAS = [

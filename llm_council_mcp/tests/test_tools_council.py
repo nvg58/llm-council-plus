@@ -11,10 +11,7 @@ def server():
     return create_server(base_url="http://test:8001")
 
 
-def get_text(call_tool_result) -> str:
-    """Extract plain text from call_tool's (content_blocks, raw) tuple."""
-    content_blocks, _ = call_tool_result
-    return content_blocks[0].text
+from llm_council_mcp.tests.conftest import get_text
 
 
 @pytest.mark.asyncio
