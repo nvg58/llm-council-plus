@@ -192,6 +192,8 @@ async def buffer_debate(events: AsyncIterator[dict], conversation_id: str) -> di
     tiebreaker: dict | None = None
     verdict: dict | None = None
     consensus_reached: bool = False
+    consensus_round: int | None = None
+    round_extracts: list[dict] = []
     question: str = ""
 
     for event in all_events:
@@ -225,8 +227,15 @@ async def buffer_debate(events: AsyncIterator[dict], conversation_id: str) -> di
             data = event.get("data", {})
             rnum = data.get("round_number", 1)
             consensus_reached = data.get("consensus_reached", False)
+            if consensus_reached:
+                consensus_round = rnum
             # Authoritative responses for this round
-            rounds_acc[rnum] = {"round": rnum, "responses": data.get("responses", [])}
+            rounds_acc[rnum] = {
+                "round": rnum,
+                "responses": data.get("responses", []),
+                "consensus_scores": data.get("consensus_scores", {}),
+                "average_consensus_score": data.get("average_consensus_score"),
+            }
 
         elif etype == "advisor_tiebreaker":
             tiebreaker = event.get("data")
@@ -238,9 +247,18 @@ async def buffer_debate(events: AsyncIterator[dict], conversation_id: str) -> di
             # Authoritative final event — overrides all accumulated data
             data = event.get("data", {})
             stored_rounds = data.get("rounds", [])
-            rounds_acc = {r["round_number"]: {"round": r["round_number"], "responses": r.get("responses", [])}
-                          for r in stored_rounds}
+            rounds_acc = {
+                r["round_number"]: {
+                    "round": r["round_number"],
+                    "responses": r.get("responses", []),
+                    "consensus_scores": r.get("consensus_scores", {}),
+                    "average_consensus_score": r.get("average_consensus_score"),
+                }
+                for r in stored_rounds
+            }
             consensus_reached = data.get("consensus_reached", False)
+            consensus_round = data.get("consensus_round", consensus_round)
+            round_extracts = data.get("round_extracts", round_extracts)
             if data.get("tiebreaker"):
                 tiebreaker = data["tiebreaker"]
             if data.get("verdict"):
@@ -279,10 +297,12 @@ async def buffer_debate(events: AsyncIterator[dict], conversation_id: str) -> di
         "question": question,
         "status": "success",
         "consensus_reached": consensus_reached,
+        "consensus_round": consensus_round,
         "rounds_completed": len(rounds_list),
         "web_search": web_search,
         "personas": personas,
         "rounds": rounds_list,
+        "round_extracts": round_extracts,
         "tiebreaker": tiebreaker,
         "verdict": verdict,
         "summary": {

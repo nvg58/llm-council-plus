@@ -1,9 +1,6 @@
-import React, { useState, useMemo } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import { useState, useMemo } from 'react';
 import AdvisorGrid from './AdvisorGrid';
-
-const REMARK_PLUGINS = [remarkGfm];
+import MarkdownContent from './MarkdownContent';
 import './DebateView.css';
 
 const toStr = (v) => (typeof v === 'string' ? v : String(v || ''));
@@ -65,9 +62,7 @@ function RoundSection({ roundIndex, roundData, personas, isLast, isRunning }) {
                     </div>
                   </div>
                 ) : (
-                  <div className="markdown-content">
-                    <ReactMarkdown remarkPlugins={REMARK_PLUGINS}>{toStr(resp.content)}</ReactMarkdown>
-                  </div>
+                  <MarkdownContent>{toStr(resp.content)}</MarkdownContent>
                 )}
               </div>
             </div>
@@ -203,9 +198,7 @@ export default function DebateView({
               <span className="debate-view__tiebreaker-model">{tiebreaker.model}</span>
             )}
           </div>
-          <div className="markdown-content">
-            <ReactMarkdown remarkPlugins={REMARK_PLUGINS}>{toStr(tiebreaker.content)}</ReactMarkdown>
-          </div>
+          <MarkdownContent>{toStr(tiebreaker.content)}</MarkdownContent>
         </div>
       )}
 
@@ -245,9 +238,9 @@ export default function DebateView({
               </button>
             )}
           </div>
-          <div className="debate-view__verdict-body markdown-content">
-            <ReactMarkdown remarkPlugins={REMARK_PLUGINS}>{toStr(verdict.content)}</ReactMarkdown>
-          </div>
+          <MarkdownContent className="debate-view__verdict-body">
+            {toStr(verdict.content)}
+          </MarkdownContent>
         </div>
       )}
     </div>

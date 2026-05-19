@@ -24,7 +24,7 @@ PERSONA_INNOVATOR = {"id": "innovator", "name": "The Innovator", "role": "Creati
                      "avatar_emoji": "💡", "color": "#8b5cf6", "is_customized": False}
 
 
-def _debate_start_event(personas=None, max_rounds=2, question="Test?"):
+def _debate_start_event(personas=None, max_rounds=3, question="Test?"):
     return {
         "type": "advisor_debate_start",
         "data": {
@@ -37,6 +37,7 @@ def _debate_start_event(personas=None, max_rounds=2, question="Test?"):
 
 
 def _response_event(persona_id, persona_name, model, content, consensus, round_num=1):
+    consensus_score = 5 if consensus else 2
     return {
         "type": "advisor_response",
         "data": {
@@ -46,6 +47,7 @@ def _response_event(persona_id, persona_name, model, content, consensus, round_n
             "content": content,
             "error": None,
             "consensus": consensus,
+            "consensus_score": consensus_score,
         },
         "round": round_num,
         "count": 1,
@@ -54,12 +56,16 @@ def _response_event(persona_id, persona_name, model, content, consensus, round_n
 
 
 def _round_complete_event(round_num, responses, consensus_reached):
+    scores = {r["persona_id"]: r.get("consensus_score", 5 if r.get("consensus") else 2) for r in responses}
+    average_score = round(sum(scores.values()) / len(scores), 2) if scores else None
     return {
         "type": "advisor_round_complete",
         "data": {
             "round_number": round_num,
             "responses": responses,
             "consensus_votes": {r["persona_id"]: r["consensus"] for r in responses},
+            "consensus_scores": scores,
+            "average_consensus_score": average_score,
             "consensus_reached": consensus_reached,
         },
     }
@@ -99,7 +105,7 @@ async def test_happy_path_two_rounds():
     personas = [PERSONA_SKEPTIC, PERSONA_PRAGMATIST]
 
     events = [
-        _debate_start_event(personas=personas, max_rounds=2, question="Best approach?"),
+        _debate_start_event(personas=personas, max_rounds=3, question="Best approach?"),
         {"type": "advisor_round_start", "data": {"round_number": 1, "order": ["skeptic", "pragmatist"], "is_parallel": True}},
         _response_event("skeptic", "The Skeptic", "gpt-4", "Skeptic R1", False, 1),
         _response_event("pragmatist", "The Pragmatist", "gpt-4", "Pragmatist R1", False, 1),
@@ -178,7 +184,7 @@ async def test_tiebreaker_fires_for_two_personas():
     personas = [PERSONA_SKEPTIC, PERSONA_PRAGMATIST]
 
     events = [
-        _debate_start_event(personas=personas, max_rounds=1),
+        _debate_start_event(personas=personas, max_rounds=3),
         _round_complete_event(1, r1_responses, False),
         {"type": "advisor_tiebreaker_start"},
         {"type": "advisor_tiebreaker", "data": tiebreaker_data},
@@ -301,22 +307,22 @@ async def test_stream_ends_without_complete_returns_retryable_error():
 
 
 @pytest.mark.asyncio
-async def test_single_round_debate():
-    """max_rounds=1, debate completes normally after one round."""
+async def test_early_consensus_with_three_round_limit():
+    """max_rounds=3 can still complete after one round when consensus is reached."""
     r1_responses = [
-        {"persona_id": "skeptic", "persona_name": "The Skeptic", "model": "gpt-4", "content": "One shot", "consensus": False},
-        {"persona_id": "pragmatist", "persona_name": "The Pragmatist", "model": "gpt-4", "content": "One shot", "consensus": False},
+        {"persona_id": "skeptic", "persona_name": "The Skeptic", "model": "gpt-4", "content": "One shot", "consensus": True, "consensus_score": 5},
+        {"persona_id": "pragmatist", "persona_name": "The Pragmatist", "model": "gpt-4", "content": "One shot", "consensus": True, "consensus_score": 5},
     ]
     verdict_data = {"model": "gpt-4", "content": "Quick verdict", "error": None}
     personas = [PERSONA_SKEPTIC, PERSONA_PRAGMATIST]
 
     events = [
-        _debate_start_event(personas=personas, max_rounds=1),
-        _round_complete_event(1, r1_responses, False),
+        _debate_start_event(personas=personas, max_rounds=3),
+        _round_complete_event(1, r1_responses, True),
         _verdict_event("gpt-4", "Quick verdict"),
         _complete_event(
             rounds=[{"round_number": 1, "responses": r1_responses}],
-            consensus_reached=False,
+            consensus_reached=True,
             verdict=verdict_data,
             tiebreaker=None,
             personas=personas,
@@ -342,7 +348,7 @@ async def test_three_personas_no_tiebreaker():
     personas = [PERSONA_SKEPTIC, PERSONA_PRAGMATIST, PERSONA_INNOVATOR]
 
     events = [
-        _debate_start_event(personas=personas, max_rounds=1),
+        _debate_start_event(personas=personas, max_rounds=3),
         _round_complete_event(1, r1_responses, False),
         _verdict_event("gpt-4", "Split verdict"),
         _complete_event(
@@ -396,3 +402,34 @@ async def test_advisor_complete_is_authoritative():
     assert result["consensus_reached"] is True
     assert result["verdict"]["content"] == "True verdict"
     assert result["verdict"]["model"] == "new-model"
+
+
+@pytest.mark.asyncio
+async def test_advisor_complete_preserves_round_level_consensus_scores():
+    responses = [
+        {"persona_id": "skeptic", "persona_name": "The Skeptic", "model": "gpt-4", "content": "OK", "consensus": True, "consensus_score": 4},
+        {"persona_id": "pragmatist", "persona_name": "The Pragmatist", "model": "gpt-4", "content": "OK", "consensus": True, "consensus_score": 5},
+    ]
+    verdict_data = {"model": "gpt-4", "content": "Verdict", "error": None}
+    personas = [PERSONA_SKEPTIC, PERSONA_PRAGMATIST]
+
+    events = [
+        _debate_start_event(personas=personas),
+        _complete_event(
+            rounds=[{
+                "round_number": 1,
+                "responses": responses,
+                "consensus_scores": {"skeptic": 4, "pragmatist": 5},
+                "average_consensus_score": 4.5,
+            }],
+            consensus_reached=True,
+            verdict=verdict_data,
+            tiebreaker=None,
+            personas=personas,
+        ),
+    ]
+
+    result = await buffer_debate(_make_iter(events), "conv-11")
+
+    assert result["rounds"][0]["consensus_scores"] == {"skeptic": 4, "pragmatist": 5}
+    assert result["rounds"][0]["average_consensus_score"] == 4.5

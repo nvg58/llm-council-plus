@@ -29,7 +29,7 @@
   /* Typography */
   --font-display: 'Syne', sans-serif;
   --font-ui: 'Plus Jakarta Sans', system-ui, sans-serif;
-  --font-content: 'Source Serif 4', Georgia, serif;
+  --font-content: 'IBM Plex Sans', 'Plus Jakarta Sans', system-ui, sans-serif;
   --font-code: 'JetBrains Mono', monospace;
 
   /* Shadows & glow */
@@ -102,9 +102,10 @@ body::after {
 /* Markdown Content Styling */
 .markdown-content {
   font-family: var(--font-content);
-  font-size: 15px;
-  line-height: 1.75;
-  color: #e2e8f0;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.68;
+  color: #dce6f2;
 }
 
 .markdown-content h1,
@@ -120,6 +121,11 @@ body::after {
 
 .markdown-content p {
   margin-bottom: 1em;
+}
+
+.markdown-content strong {
+  font-weight: 600;
+  color: #f2f6fb;
 }
 
 .markdown-content code {

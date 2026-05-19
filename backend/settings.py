@@ -68,6 +68,13 @@ from .prompts import (
     TITLE_PROMPT_DEFAULT,
     QUERY_PROMPT_DEFAULT
 )
+from .advisor_prompts import (
+    ADVISOR_ROUND1_PROMPT,
+    ADVISOR_FOLLOWUP_PROMPT,
+    ADVISOR_CROSS_POLLINATION_PROMPT,
+    ADVISOR_VERDICT_PROMPT,
+    ADVISOR_TIEBREAKER_PROMPT,
+)
 
 class Settings(BaseModel):
     """Application settings."""
@@ -135,7 +142,42 @@ class Settings(BaseModel):
     advisor_default_model: str = ""
     advisor_tiebreaker_model: str = ""
     advisor_temperature: float = 0.7
-    advisor_default_rounds: int = 2
+    advisor_default_rounds: int = 3
+    advisor_round1_prompt: str = ADVISOR_ROUND1_PROMPT
+    advisor_followup_prompt: str = ADVISOR_FOLLOWUP_PROMPT
+    advisor_cross_pollination_prompt: str = ADVISOR_CROSS_POLLINATION_PROMPT
+    advisor_verdict_prompt: str = ADVISOR_VERDICT_PROMPT
+    advisor_tiebreaker_prompt: str = ADVISOR_TIEBREAKER_PROMPT
+
+
+PROMPT_DEFAULTS = {
+    "stage1_prompt": STAGE1_PROMPT_DEFAULT,
+    "stage2_prompt": STAGE2_PROMPT_DEFAULT,
+    "stage3_prompt": STAGE3_PROMPT_DEFAULT,
+    "title_prompt": TITLE_PROMPT_DEFAULT,
+    "query_prompt": QUERY_PROMPT_DEFAULT,
+    "advisor_round1_prompt": ADVISOR_ROUND1_PROMPT,
+    "advisor_followup_prompt": ADVISOR_FOLLOWUP_PROMPT,
+    "advisor_cross_pollination_prompt": ADVISOR_CROSS_POLLINATION_PROMPT,
+    "advisor_verdict_prompt": ADVISOR_VERDICT_PROMPT,
+    "advisor_tiebreaker_prompt": ADVISOR_TIEBREAKER_PROMPT,
+}
+
+
+def _normalize_prompt_defaults(data: dict) -> dict:
+    """Backfill defaults for older settings files that persisted invalid values."""
+    normalized = dict(data)
+    for key, default in PROMPT_DEFAULTS.items():
+        value = normalized.get(key)
+        if not isinstance(value, str) or not value.strip():
+            normalized[key] = default
+
+    rounds = normalized.get("advisor_default_rounds")
+    if not isinstance(rounds, int) or rounds < 3:
+        normalized["advisor_default_rounds"] = 3
+    elif rounds > 10:
+        normalized["advisor_default_rounds"] = 10
+    return normalized
 
 
 _settings_cache: Settings | None = None
@@ -153,7 +195,7 @@ def get_settings() -> Settings:
                 return _settings_cache
             with open(SETTINGS_FILE, "r") as f:
                 data = json.load(f)
-                _settings_cache = Settings(**data)
+                _settings_cache = Settings(**_normalize_prompt_defaults(data))
                 _settings_mtime = mtime
                 return _settings_cache
         except Exception:
@@ -184,6 +226,7 @@ def update_settings(**kwargs) -> Settings:
     current = get_settings()
     updated_data = current.model_dump()
     updated_data.update(kwargs)
+    updated_data = _normalize_prompt_defaults(updated_data)
     updated = Settings(**updated_data)
     save_settings(updated)
     return updated

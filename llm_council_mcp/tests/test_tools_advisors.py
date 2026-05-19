@@ -30,7 +30,7 @@ ADVISOR_SETTINGS = {
     "advisor_default_model": "openai:gpt-4.1",
     "advisor_tiebreaker_model": "",
     "advisor_temperature": 0.7,
-    "advisor_default_rounds": 2,
+    "advisor_default_rounds": 3,
     "council_models": ["openai:gpt-4.1"],
 }
 
@@ -196,7 +196,7 @@ async def test_get_advisor_config_values(server):
         data = get_json(result)
     assert data["advisor_default_model"] == "openai:gpt-4.1"
     assert data["advisor_temperature"] == 0.7
-    assert data["advisor_default_rounds"] == 2
+    assert data["advisor_default_rounds"] == 3
 
 
 # ── configure_advisors ────────────────────────────────────────────────────────
@@ -214,6 +214,13 @@ async def test_configure_advisors_single_field(server):
         text = get_text(result)
     assert "updated" in text.lower()
     assert "advisor_default_rounds" in text
+
+
+@pytest.mark.asyncio
+async def test_configure_advisors_rejects_default_rounds_below_three(server):
+    result = await server.call_tool("configure_advisors", {"default_rounds": 2})
+    text = get_text(result)
+    assert "default_rounds must be between 3 and 10" in text
 
 
 @pytest.mark.asyncio
@@ -252,13 +259,14 @@ def _make_debate_sse(question: str = "Test?", consensus: bool = True) -> str:
     ]
     responses = [
         {"persona_id": "skeptic", "persona_name": "The Skeptic", "model": "gpt-4",
-         "content": "Skeptic answer", "consensus": consensus},
+         "content": "Skeptic answer", "consensus": consensus, "consensus_score": 5 if consensus else 2},
         {"persona_id": "pragmatist", "persona_name": "The Pragmatist", "model": "gpt-4",
-         "content": "Pragmatist answer", "consensus": consensus},
+         "content": "Pragmatist answer", "consensus": consensus, "consensus_score": 5 if consensus else 2},
     ]
+    consensus_scores = {"skeptic": 5 if consensus else 2, "pragmatist": 5 if consensus else 2}
     events = [
-        {"type": "advisor_debate_start", "data": {"personas": personas, "max_rounds": 1, "question": question, "web_search": False}},
-        {"type": "advisor_round_complete", "data": {"round_number": 1, "responses": responses, "consensus_votes": {"skeptic": consensus, "pragmatist": consensus}, "consensus_reached": consensus}},
+        {"type": "advisor_debate_start", "data": {"personas": personas, "max_rounds": 3, "question": question, "web_search": False}},
+        {"type": "advisor_round_complete", "data": {"round_number": 1, "responses": responses, "consensus_votes": {"skeptic": consensus, "pragmatist": consensus}, "consensus_scores": consensus_scores, "average_consensus_score": 5 if consensus else 2, "consensus_reached": consensus}},
         {"type": "advisor_verdict", "data": {"model": "gpt-4", "content": "Final verdict text", "error": None}},
         {"type": "advisor_complete", "data": {
             "rounds": [{"round_number": 1, "responses": responses}],
@@ -351,7 +359,19 @@ async def test_run_advisor_debate_invalid_rounds(server):
         "max_rounds": 0,
     })
     text = get_text(result)
-    assert "1 and 10" in text
+    assert "3 and 10" in text
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("invalid_rounds", [1, 2])
+async def test_run_advisor_debate_rejects_rounds_below_three(server, invalid_rounds):
+    result = await server.call_tool("run_advisor_debate", {
+        "question": "Test?",
+        "persona_ids": ["skeptic", "pragmatist"],
+        "max_rounds": invalid_rounds,
+    })
+    text = get_text(result)
+    assert "3 and 10" in text
 
 
 @pytest.mark.asyncio

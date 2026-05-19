@@ -234,9 +234,9 @@
 }
 
 .ranking-content {
-  color: var(--text-primary);
-  line-height: 1.7;
-  font-size: 15px;
+  color: #dce6f2;
+  line-height: 1.68;
+  font-size: 16px;
   font-family: var(--font-content);
 }
 
@@ -525,8 +525,8 @@
   }
 
   .ranking-content {
-    font-size: 14px;
-    line-height: 1.6;
+    font-size: 15px;
+    line-height: 1.65;
   }
 
   .parsed-ranking ol {

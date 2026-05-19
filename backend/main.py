@@ -16,7 +16,7 @@ import asyncio
 from . import storage
 from .council import generate_conversation_title, generate_search_query, stage1_collect_responses, stage2_collect_rankings, stage3_synthesize_final, calculate_aggregate_rankings, PROVIDERS
 from .search import perform_web_search, SearchProvider
-from .settings import get_settings, save_settings, update_settings, Settings, DEFAULT_COUNCIL_MODELS, DEFAULT_CHAIRMAN_MODEL, AVAILABLE_MODELS
+from .settings import get_settings, save_settings, update_settings, Settings, DEFAULT_COUNCIL_MODELS, DEFAULT_CHAIRMAN_MODEL, AVAILABLE_MODELS, PROMPT_DEFAULTS
 from .personas import get_all_personas, save_persona_override, delete_persona_override, get_persona
 from .advisors import run_debate
 
@@ -125,7 +125,7 @@ class StartDebateRequest(BaseModel):
     persona_ids: List[str]
     model_assignments: Optional[Dict[str, str]] = None
     default_model: Optional[str] = None
-    max_rounds: int = 2
+    max_rounds: int = 3
     web_search: bool = False
     search_provider: Optional[str] = None
 
@@ -562,8 +562,8 @@ async def start_debate_stream(conversation_id: str, body: StartDebateRequest, re
         raise HTTPException(status_code=400, detail="At least 2 advisors required")
     if len(body.persona_ids) > 4:
         raise HTTPException(status_code=400, detail="Maximum 4 advisors allowed")
-    if body.max_rounds < 1 or body.max_rounds > 10:
-        raise HTTPException(status_code=400, detail="Rounds must be between 1 and 10")
+    if body.max_rounds < 3 or body.max_rounds > 10:
+        raise HTTPException(status_code=400, detail="Rounds must be between 3 and 10")
 
     is_first_message = len(conversation["messages"]) == 0
 
@@ -798,12 +798,19 @@ class UpdateSettingsRequest(BaseModel):
     stage1_prompt: Optional[str] = None
     stage2_prompt: Optional[str] = None
     stage3_prompt: Optional[str] = None
+    title_prompt: Optional[str] = None
+    query_prompt: Optional[str] = None
 
     # Advisor Settings
     advisor_default_model: Optional[str] = None
     advisor_tiebreaker_model: Optional[str] = None
     advisor_temperature: Optional[float] = None
     advisor_default_rounds: Optional[int] = None
+    advisor_round1_prompt: Optional[str] = None
+    advisor_followup_prompt: Optional[str] = None
+    advisor_cross_pollination_prompt: Optional[str] = None
+    advisor_verdict_prompt: Optional[str] = None
+    advisor_tiebreaker_prompt: Optional[str] = None
 
 
 
@@ -864,12 +871,19 @@ async def get_app_settings():
         "stage1_prompt": settings.stage1_prompt,
         "stage2_prompt": settings.stage2_prompt,
         "stage3_prompt": settings.stage3_prompt,
+        "title_prompt": settings.title_prompt,
+        "query_prompt": settings.query_prompt,
 
         # Advisor Settings
         "advisor_default_model": settings.advisor_default_model,
         "advisor_tiebreaker_model": settings.advisor_tiebreaker_model,
         "advisor_temperature": settings.advisor_temperature,
         "advisor_default_rounds": settings.advisor_default_rounds,
+        "advisor_round1_prompt": settings.advisor_round1_prompt,
+        "advisor_followup_prompt": settings.advisor_followup_prompt,
+        "advisor_cross_pollination_prompt": settings.advisor_cross_pollination_prompt,
+        "advisor_verdict_prompt": settings.advisor_verdict_prompt,
+        "advisor_tiebreaker_prompt": settings.advisor_tiebreaker_prompt,
     }
 
 
@@ -877,23 +891,12 @@ async def get_app_settings():
 @app.get("/api/settings/defaults")
 async def get_default_settings():
     """Get default model settings."""
-    from .prompts import (
-        STAGE1_PROMPT_DEFAULT,
-        STAGE2_PROMPT_DEFAULT,
-        STAGE3_PROMPT_DEFAULT,
-        TITLE_PROMPT_DEFAULT,
-        QUERY_PROMPT_DEFAULT
-    )
     from .settings import DEFAULT_ENABLED_PROVIDERS
     return {
         "council_models": DEFAULT_COUNCIL_MODELS,
         "chairman_model": DEFAULT_CHAIRMAN_MODEL,
         "enabled_providers": DEFAULT_ENABLED_PROVIDERS,
-        "stage1_prompt": STAGE1_PROMPT_DEFAULT,
-        "stage2_prompt": STAGE2_PROMPT_DEFAULT,
-        "stage3_prompt": STAGE3_PROMPT_DEFAULT,
-        "title_prompt": TITLE_PROMPT_DEFAULT,
-        "query_prompt": QUERY_PROMPT_DEFAULT,
+        **PROMPT_DEFAULTS,
     }
 
 
@@ -978,6 +981,10 @@ async def update_app_settings(request: UpdateSettingsRequest):
         updates["stage2_prompt"] = request.stage2_prompt
     if request.stage3_prompt is not None:
         updates["stage3_prompt"] = request.stage3_prompt
+    if request.title_prompt is not None:
+        updates["title_prompt"] = request.title_prompt
+    if request.query_prompt is not None:
+        updates["query_prompt"] = request.query_prompt
 
     if request.serper_api_key is not None:
         updates["serper_api_key"] = request.serper_api_key
@@ -1072,7 +1079,17 @@ async def update_app_settings(request: UpdateSettingsRequest):
     if request.advisor_temperature is not None:
         updates["advisor_temperature"] = request.advisor_temperature
     if request.advisor_default_rounds is not None:
-        updates["advisor_default_rounds"] = max(1, min(10, request.advisor_default_rounds))
+        updates["advisor_default_rounds"] = max(3, min(10, request.advisor_default_rounds))
+    if request.advisor_round1_prompt is not None:
+        updates["advisor_round1_prompt"] = request.advisor_round1_prompt
+    if request.advisor_followup_prompt is not None:
+        updates["advisor_followup_prompt"] = request.advisor_followup_prompt
+    if request.advisor_cross_pollination_prompt is not None:
+        updates["advisor_cross_pollination_prompt"] = request.advisor_cross_pollination_prompt
+    if request.advisor_verdict_prompt is not None:
+        updates["advisor_verdict_prompt"] = request.advisor_verdict_prompt
+    if request.advisor_tiebreaker_prompt is not None:
+        updates["advisor_tiebreaker_prompt"] = request.advisor_tiebreaker_prompt
 
     if updates:
         settings = update_settings(**updates)
@@ -1120,12 +1137,19 @@ async def update_app_settings(request: UpdateSettingsRequest):
         "stage1_prompt": settings.stage1_prompt,
         "stage2_prompt": settings.stage2_prompt,
         "stage3_prompt": settings.stage3_prompt,
+        "title_prompt": settings.title_prompt,
+        "query_prompt": settings.query_prompt,
 
         # Advisor Settings
         "advisor_default_model": settings.advisor_default_model,
         "advisor_tiebreaker_model": settings.advisor_tiebreaker_model,
         "advisor_temperature": settings.advisor_temperature,
         "advisor_default_rounds": settings.advisor_default_rounds,
+        "advisor_round1_prompt": settings.advisor_round1_prompt,
+        "advisor_followup_prompt": settings.advisor_followup_prompt,
+        "advisor_cross_pollination_prompt": settings.advisor_cross_pollination_prompt,
+        "advisor_verdict_prompt": settings.advisor_verdict_prompt,
+        "advisor_tiebreaker_prompt": settings.advisor_tiebreaker_prompt,
     }
 
 

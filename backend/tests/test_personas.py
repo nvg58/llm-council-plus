@@ -34,9 +34,27 @@ def isolated_overrides(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 
 # ── get_all_personas ──────────────────────────────────────────────────────────
 
-def test_get_all_personas_returns_ten():
+def test_get_all_personas_returns_twelve():
     result = get_all_personas()
-    assert len(result) == 10
+    assert len(result) == 12
+
+
+def test_default_personas_include_comedian_and_economist():
+    result = get_all_personas()
+    ids = {p.id for p in result}
+    assert "comedian" in ids
+    assert "economist" in ids
+
+
+def test_default_persona_ids_are_unique():
+    ids = [p.id for p in DEFAULT_PERSONAS]
+    assert len(ids) == len(set(ids))
+
+
+def test_default_persona_prompts_include_behavioral_depth():
+    for persona in DEFAULT_PERSONAS:
+        assert len(persona.system_prompt.split()) >= 60
+        assert "Your job is" in persona.system_prompt
 
 
 def test_get_all_personas_all_are_persona_instances():

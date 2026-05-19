@@ -17,7 +17,7 @@ export default function AdvisorSetup({
   const [modelMode, setModelMode] = useState('simple');
   const [chosenModel, setChosenModel] = useState('');
   const [modelAssignments, setModelAssignments] = useState({});
-  const [rounds, setRounds] = useState(2);
+  const [rounds, setRounds] = useState(3);
   const [editingPersona, setEditingPersona] = useState(null);
   const [editForm, setEditForm] = useState({ name: '', role: '', description: '', system_prompt: '', avatar_emoji: '' });
   const [editSaving, setEditSaving] = useState(false);
@@ -88,7 +88,7 @@ export default function AdvisorSetup({
         }
 
         if (settings.advisor_default_rounds) {
-          setRounds(settings.advisor_default_rounds);
+          setRounds(Math.min(10, Math.max(3, settings.advisor_default_rounds)));
         }
       } catch (err) {
         console.error('Failed to load advisor models:', err);
@@ -138,7 +138,7 @@ export default function AdvisorSetup({
   };
 
   const handleRoundsStep = (delta) => {
-    setRounds((prev) => Math.min(10, Math.max(1, prev + delta)));
+    setRounds((prev) => Math.min(10, Math.max(3, prev + delta)));
   };
 
   const openEditModal = (e, persona) => {
@@ -261,7 +261,7 @@ export default function AdvisorSetup({
                 type="button"
                 className="advisor-setup__stepper-btn"
                 onClick={() => handleRoundsStep(-1)}
-                disabled={rounds <= 1}
+                disabled={rounds <= 3}
                 aria-label="Decrease rounds"
               >
                 −

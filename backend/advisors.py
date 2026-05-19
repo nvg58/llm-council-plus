@@ -11,6 +11,7 @@ from .settings import get_settings
 from .advisor_prompts import (
     ADVISOR_ROUND1_PROMPT,
     ADVISOR_FOLLOWUP_PROMPT,
+    ADVISOR_CROSS_POLLINATION_PROMPT,
     ADVISOR_VERDICT_PROMPT,
     ADVISOR_TIEBREAKER_PROMPT,
     CONSENSUS_TAG_INSTRUCTION,
@@ -19,21 +20,21 @@ from .advisor_prompts import (
 logger = logging.getLogger(__name__)
 
 
-def parse_consensus_tag(content: str) -> bool:
-    """Extract CONSENSUS:YES or CONSENSUS:NO from end of response."""
+def parse_consensus_tag(content: str) -> Optional[int]:
+    """Extract CONSENSUS_SCORE: 1-5 from the end of a response."""
     if not content:
-        return False
-    match = re.search(r"CONSENSUS:(YES|NO)\s*$", content.strip(), re.IGNORECASE)
+        return None
+    match = re.search(r"CONSENSUS_SCORE:\s*\[?([1-5])\]?\s*$", content.strip(), re.IGNORECASE)
     if match:
-        return match.group(1).upper() == "YES"
-    return False
+        return int(match.group(1))
+    return None
 
 
 def strip_consensus_tag(content: str) -> str:
-    """Remove the CONSENSUS tag from the response for display."""
+    """Remove the CONSENSUS_SCORE tag from the response for display."""
     if not content:
         return content
-    return re.sub(r"\n*CONSENSUS:(YES|NO)\s*$", "", content.strip(), flags=re.IGNORECASE).strip()
+    return re.sub(r"\n*CONSENSUS_SCORE:\s*\[?[1-5]\]?\s*$", "", content.strip(), flags=re.IGNORECASE).strip()
 
 
 def build_rotation_order(persona_ids: List[str], round_number: int) -> List[str]:
@@ -53,6 +54,82 @@ def _format_transcript(rounds: List[Dict[str, Any]], personas: Dict[str, Persona
             name = p.name if p else resp["persona_id"]
             role = p.role if p else ""
             lines.append(f"\n{name} ({role}):\n{resp['content']}")
+    return "\n".join(lines)
+
+
+def _average_consensus_score(scores: Dict[str, Optional[int]]) -> Optional[float]:
+    numeric_scores = [score for score in scores.values() if isinstance(score, int)]
+    if not numeric_scores:
+        return None
+    return round(sum(numeric_scores) / len(numeric_scores), 2)
+
+
+def _count_words(content: str) -> int:
+    """Count display words for advisor response limit enforcement."""
+    if not content:
+        return 0
+    return len(re.findall(r"\b[\w'-]+\b", content))
+
+
+def _settings_prompt(settings: Any, key: str, default: str) -> str:
+    """Return a saved prompt template, falling back to the built-in default."""
+    prompt = getattr(settings, key, None)
+    if isinstance(prompt, str) and prompt.strip():
+        return prompt
+    return default
+
+
+def _format_debate_arc(
+    all_rounds: List[Dict[str, Any]],
+    personas: Dict[str, Persona],
+    round_extracts: List[Dict[str, Any]],
+    consensus_reached: bool,
+    consensus_round: Optional[int],
+) -> str:
+    """Build a compact debate-arc signal for the verdict model."""
+    if not all_rounds:
+        return "No completed rounds."
+
+    first_round = all_rounds[0]
+    final_round = all_rounds[-1]
+    first_extract = round_extracts[0]["content"] if round_extracts else "No distilled Round 1 summary was produced."
+
+    lines = [
+        f"Consensus reached: {'yes' if consensus_reached else 'no'}",
+        f"Consensus round: {consensus_round if consensus_round else 'none'}",
+        f"Final round average consensus score: {final_round.get('average_consensus_score')}",
+        "",
+        "Round 1 summary:",
+        first_extract,
+        "",
+        "Final round summary:",
+    ]
+
+    for resp in final_round.get("responses", []):
+        pid = resp["persona_id"]
+        persona = personas.get(pid)
+        name = persona.name if persona else resp.get("persona_name", pid)
+        content = (resp.get("content") or "").strip().replace("\n", " ")
+        summary = content[:300] + ("..." if len(content) > 300 else "")
+        lines.append(
+            f"- {name}: {summary} Final consensus score: {resp.get('consensus_score')}"
+        )
+
+    lines.extend(["", "Starting vs final positions:"])
+    first_by_pid = {resp["persona_id"]: resp for resp in first_round.get("responses", [])}
+    final_by_pid = {resp["persona_id"]: resp for resp in final_round.get("responses", [])}
+    for pid, final_resp in final_by_pid.items():
+        persona = personas.get(pid)
+        name = persona.name if persona else final_resp.get("persona_name", pid)
+        start = (first_by_pid.get(pid, {}).get("content") or "").strip().replace("\n", " ")
+        final = (final_resp.get("content") or "").strip().replace("\n", " ")
+        start_summary = start[:220] + ("..." if len(start) > 220 else "")
+        final_summary = final[:220] + ("..." if len(final) > 220 else "")
+        lines.append(
+            f"- {name}: starting position: {start_summary}; "
+            f"final position: {final_summary}; Final consensus score: {final_resp.get('consensus_score')}"
+        )
+
     return "\n".join(lines)
 
 
@@ -106,7 +183,7 @@ async def run_debate(
     persona_ids: List[str],
     model_assignments: Optional[Dict[str, str]] = None,
     default_model: Optional[str] = None,
-    max_rounds: int = 2,
+    max_rounds: int = 3,
     web_search: bool = False,
     search_context: str = "",
     request: Any = None,
@@ -121,7 +198,7 @@ async def run_debate(
         persona_ids: List of persona IDs to participate (2-4)
         model_assignments: Optional per-persona model mapping
         default_model: Fallback model for all personas
-        max_rounds: Maximum debate rounds (1-10)
+        max_rounds: Maximum debate rounds (3-10)
         web_search: Whether web search was used
         search_context: Pre-fetched search results
         request: FastAPI request for disconnect detection
@@ -133,6 +210,9 @@ async def run_debate(
         default_model = settings.advisor_default_model
     if not default_model:
         yield {"type": "advisor_error", "message": "No advisor model configured. Set a default model in Settings."}
+        return
+    if max_rounds < 3 or max_rounds > 10:
+        yield {"type": "advisor_error", "message": "Rounds must be between 3 and 10."}
         return
 
     personas_list = get_personas_by_ids(persona_ids)
@@ -162,7 +242,10 @@ async def run_debate(
     }
 
     all_rounds: List[Dict[str, Any]] = []
+    round_extracts: List[Dict[str, Any]] = []
     consensus_reached = False
+    consensus_round: Optional[int] = None
+    extract_model = settings.advisor_tiebreaker_model or default_model
 
     for round_num in range(1, max_rounds + 1):
         if request and await request.is_disconnected():
@@ -179,20 +262,33 @@ async def run_debate(
 
         round_responses: List[Dict[str, Any]] = []
         consensus_votes: Dict[str, bool] = {}
+        consensus_scores: Dict[str, Optional[int]] = {}
+        word_limit = 150 if is_first_round else 250
 
         if is_first_round:
-            prompt_template = ADVISOR_ROUND1_PROMPT.format(
+            prompt_template = _settings_prompt(
+                settings, "advisor_round1_prompt", ADVISOR_ROUND1_PROMPT
+            ).format(
                 search_context_block=search_context_block,
                 question=question,
                 consensus_tag=CONSENSUS_TAG_INSTRUCTION,
             )
         else:
             transcript_text = _format_transcript(all_rounds, personas_map)
-            prompt_template = ADVISOR_FOLLOWUP_PROMPT.format(
+            previous_extract = (
+                round_extracts[-1]["content"]
+                if round_extracts and round_extracts[-1].get("content")
+                else "No distilled extract was produced for the previous round. Use the transcript as fallback context."
+            )
+            prompt_template = _settings_prompt(
+                settings, "advisor_followup_prompt", ADVISOR_FOLLOWUP_PROMPT
+            ).format(
                 search_context_block=search_context_block if round_num == 2 else "",
                 question=question,
                 transcript=transcript_text,
                 round_number=round_num,
+                previous_round_number=round_num - 1,
+                cross_pollination_extract=previous_extract,
                 consensus_tag=CONSENSUS_TAG_INSTRUCTION,
             )
 
@@ -225,18 +321,36 @@ async def run_debate(
                             "content": None,
                             "error": error,
                             "consensus": False,
+                            "consensus_score": None,
                         }
                     else:
-                        has_consensus = parse_consensus_tag(content)
+                        consensus_score = parse_consensus_tag(content)
                         clean_content = strip_consensus_tag(content)
-                        consensus_votes[pid] = has_consensus
+                        word_count = _count_words(clean_content)
+                        exceeds_word_limit = word_count > word_limit
+                        has_consensus = (
+                            not exceeds_word_limit
+                            and consensus_score is not None
+                            and consensus_score >= 4
+                        )
+                        response_error = (
+                            f"Advisor response exceeded {word_limit} word limit."
+                            if exceeds_word_limit
+                            else None
+                        )
+                        if not exceeds_word_limit:
+                            consensus_votes[pid] = has_consensus
+                            consensus_scores[pid] = consensus_score
                         resp_data = {
                             "persona_id": pid,
                             "persona_name": personas_map[pid].name,
                             "model": model,
                             "content": clean_content,
-                            "error": None,
+                            "error": response_error,
                             "consensus": has_consensus,
+                            "consensus_score": None if exceeds_word_limit else consensus_score,
+                            "word_count": word_count,
+                            "word_limit": word_limit,
                         }
 
                     round_responses.append(resp_data)
@@ -256,19 +370,25 @@ async def run_debate(
             return
 
         successful_responses = [r for r in round_responses if r["error"] is None]
+        average_consensus_score = _average_consensus_score(consensus_scores)
         all_rounds.append({
             "round_number": round_num,
+            "average_consensus_score": average_consensus_score,
             "responses": [
                 {"persona_id": r["persona_id"], "persona_name": r["persona_name"],
-                 "model": r["model"], "content": r["content"]}
+                 "model": r["model"], "content": r["content"],
+                 "consensus": r["consensus"], "consensus_score": r["consensus_score"]}
                 for r in successful_responses
             ],
         })
 
         all_agree = (
-            len(consensus_votes) == len(successful_responses)
-            and all(consensus_votes.values())
+            len(successful_responses) == len(personas_list)
+            and len(consensus_scores) == len(personas_list)
+            and all(score is not None and score >= 4 for score in consensus_scores.values())
         )
+        if all_agree:
+            consensus_round = round_num
 
         yield {
             "type": "advisor_round_complete",
@@ -276,6 +396,8 @@ async def run_debate(
                 "round_number": round_num,
                 "responses": round_responses,
                 "consensus_votes": dict(consensus_votes),
+                "consensus_scores": dict(consensus_scores),
+                "average_consensus_score": average_consensus_score,
                 "consensus_reached": all_agree,
             },
         }
@@ -284,6 +406,37 @@ async def run_debate(
             consensus_reached = True
             break
 
+        if round_num < max_rounds:
+            if request and await request.is_disconnected():
+                logger.info("Client disconnected during advisor extract.")
+                return
+            round_transcript = _format_transcript([all_rounds[-1]], personas_map)
+            extract_prompt = _settings_prompt(
+                settings,
+                "advisor_cross_pollination_prompt",
+                ADVISOR_CROSS_POLLINATION_PROMPT,
+            ).format(
+                question=question,
+                round_number=round_num,
+                round_transcript=round_transcript,
+            )
+            extract_result = await _query_neutral(extract_model, extract_prompt, temperature=0.2)
+            if extract_result.get("error") or not extract_result.get("content"):
+                yield {
+                    "type": "advisor_error",
+                    "message": (
+                        "Cross-pollination extract failed after "
+                        f"Round {round_num}: {extract_result.get('error') or 'empty response'}"
+                    ),
+                }
+                return
+            round_extracts.append({
+                "round_number": round_num,
+                "model": extract_result.get("model"),
+                "content": extract_result.get("content") or "",
+                "error": extract_result.get("error"),
+            })
+
     transcript_text = _format_transcript(all_rounds, personas_map)
 
     tiebreaker_result = None
@@ -291,7 +444,9 @@ async def run_debate(
         tiebreaker_model = settings.advisor_tiebreaker_model or default_model
         yield {"type": "advisor_tiebreaker_start"}
 
-        tiebreaker_prompt = ADVISOR_TIEBREAKER_PROMPT.format(
+        tiebreaker_prompt = _settings_prompt(
+            settings, "advisor_tiebreaker_prompt", ADVISOR_TIEBREAKER_PROMPT
+        ).format(
             question=question,
             transcript=transcript_text,
         )
@@ -301,9 +456,19 @@ async def run_debate(
 
     yield {"type": "advisor_verdict_start"}
 
-    verdict_prompt = ADVISOR_VERDICT_PROMPT.format(
+    debate_arc = _format_debate_arc(
+        all_rounds,
+        personas_map,
+        round_extracts,
+        consensus_reached,
+        consensus_round,
+    )
+    verdict_prompt = _settings_prompt(
+        settings, "advisor_verdict_prompt", ADVISOR_VERDICT_PROMPT
+    ).format(
         question=question,
         transcript=transcript_text,
+        debate_arc=debate_arc,
     )
 
     if tiebreaker_result and tiebreaker_result.get("content"):
@@ -319,6 +484,8 @@ async def run_debate(
         "data": {
             "rounds": all_rounds,
             "consensus_reached": consensus_reached,
+            "consensus_round": consensus_round,
+            "round_extracts": round_extracts,
             "tiebreaker": tiebreaker_result,
             "verdict": verdict_data,
             "personas": personas_serialized,

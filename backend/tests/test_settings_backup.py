@@ -211,3 +211,95 @@ def test_reset_saves_defaults(client):
     # API keys should be None (default).
     assert saved_settings.openrouter_api_key is None
     assert saved_settings.groq_api_key is None
+
+
+def test_get_settings_returns_council_title_query_and_advisor_prompts(client):
+    response = client.get("/api/settings")
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["title_prompt"]
+    assert data["query_prompt"]
+    assert data["advisor_round1_prompt"]
+    assert data["advisor_followup_prompt"]
+    assert data["advisor_cross_pollination_prompt"]
+    assert data["advisor_verdict_prompt"]
+    assert data["advisor_tiebreaker_prompt"]
+
+
+def test_update_settings_persists_council_title_query_and_advisor_prompts(client):
+    from backend.settings import Settings
+
+    payload = {
+        "title_prompt": "Custom title {user_query}",
+        "query_prompt": "Custom query {user_query}",
+        "advisor_round1_prompt": "Custom round 1 {question}{consensus_tag}",
+        "advisor_followup_prompt": "Custom followup {question}{transcript}{round_number}{previous_round_number}{cross_pollination_extract}{consensus_tag}",
+        "advisor_cross_pollination_prompt": "Custom extract {question}{round_number}{round_transcript}",
+        "advisor_verdict_prompt": "Custom verdict {question}{transcript}{debate_arc}",
+        "advisor_tiebreaker_prompt": "Custom tiebreaker {question}{transcript}",
+    }
+
+    updated_settings = Settings(**payload)
+    with patch("backend.main.update_settings", return_value=updated_settings) as mock_update:
+        response = client.put("/api/settings", json=payload)
+
+    assert response.status_code == 200
+    mock_update.assert_called_once()
+    update_kwargs = mock_update.call_args.kwargs
+    for key, value in payload.items():
+        assert update_kwargs[key] == value
+
+    data = response.json()
+    for key, value in payload.items():
+        assert data[key] == value
+
+
+def test_default_settings_returns_council_and_advisor_prompt_defaults(client):
+    response = client.get("/api/settings/defaults")
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["title_prompt"]
+    assert data["query_prompt"]
+    assert data["advisor_round1_prompt"]
+    assert data["advisor_followup_prompt"]
+    assert data["advisor_cross_pollination_prompt"]
+    assert data["advisor_verdict_prompt"]
+    assert data["advisor_tiebreaker_prompt"]
+
+
+def test_settings_loader_backfills_blank_prompt_values(tmp_path, monkeypatch):
+    from backend import settings as settings_module
+    from backend.prompts import TITLE_PROMPT_DEFAULT, QUERY_PROMPT_DEFAULT
+    from backend.advisor_prompts import ADVISOR_ROUND1_PROMPT
+
+    settings_path = tmp_path / "settings.json"
+    settings_path.write_text(json.dumps({
+        "title_prompt": "",
+        "query_prompt": "   ",
+        "advisor_round1_prompt": "",
+    }))
+    monkeypatch.setattr(settings_module, "SETTINGS_FILE", settings_path)
+    monkeypatch.setattr(settings_module, "_settings_cache", None)
+    monkeypatch.setattr(settings_module, "_settings_mtime", 0.0)
+
+    settings = settings_module.get_settings()
+
+    assert settings.title_prompt == TITLE_PROMPT_DEFAULT
+    assert settings.query_prompt == QUERY_PROMPT_DEFAULT
+    assert settings.advisor_round1_prompt == ADVISOR_ROUND1_PROMPT
+
+
+def test_settings_loader_clamps_persisted_advisor_default_rounds(tmp_path, monkeypatch):
+    from backend import settings as settings_module
+
+    settings_path = tmp_path / "settings.json"
+    settings_path.write_text(json.dumps({"advisor_default_rounds": 2}))
+    monkeypatch.setattr(settings_module, "SETTINGS_FILE", settings_path)
+    monkeypatch.setattr(settings_module, "_settings_cache", None)
+    monkeypatch.setattr(settings_module, "_settings_mtime", 0.0)
+
+    settings = settings_module.get_settings()
+
+    assert settings.advisor_default_rounds == 3

@@ -7,12 +7,28 @@ import SearchSettings from './settings/SearchSettings';
 import PromptSettings from './settings/PromptSettings';
 import './Settings.css';
 
+const PROMPT_FIELDS = [
+  'stage1_prompt',
+  'stage2_prompt',
+  'stage3_prompt',
+  'title_prompt',
+  'query_prompt',
+  'advisor_round1_prompt',
+  'advisor_followup_prompt',
+  'advisor_cross_pollination_prompt',
+  'advisor_verdict_prompt',
+  'advisor_tiebreaker_prompt',
+];
 
+const isBlankPrompt = (value) => typeof value !== 'string' || value.trim().length === 0;
 
+const buildPromptValues = (source = {}, fallback = '') => (
+  Object.fromEntries(PROMPT_FIELDS.map(key => [key, source[key] ?? fallback]))
+);
 
 
 export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initialSection = 'llm_keys' }) {
-  const [activeSection, setActiveSection] = useState(initialSection); // 'llm_keys', 'council', 'prompts', 'search', 'import_export'
+  const [activeSection, setActiveSection] = useState(initialSection);
 
   const [settings, setSettings] = useState(null);
   const [selectedSearchProvider, setSelectedSearchProvider] = useState('duckduckgo');
@@ -103,14 +119,9 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
   const [stage2Temperature, setStage2Temperature] = useState(0.3);
 
   // System Prompts State
-  const [prompts, setPrompts] = useState({
-    stage1_prompt: '',
-    stage2_prompt: '',
-    stage3_prompt: '',
-    title_prompt: '',
-    query_prompt: '',
-  });
+  const [prompts, setPrompts] = useState(() => buildPromptValues());
   const [activePromptTab, setActivePromptTab] = useState('stage1');
+  const [activeAdvisorPromptTab, setActiveAdvisorPromptTab] = useState('advisor_round1');
 
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [showFreeOnly, setShowFreeOnly] = useState(false);
@@ -163,11 +174,7 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
       if (JSON.stringify(councilMemberFilters) !== JSON.stringify(settings.council_member_filters || {})) return true;
       if (chairmanFilter !== (settings.chairman_filter || 'remote')) return true;
       // Prompts
-      if (prompts.stage1_prompt !== settings.stage1_prompt) return true;
-      if (prompts.stage2_prompt !== settings.stage2_prompt) return true;
-      if (prompts.stage3_prompt !== settings.stage3_prompt) return true;
-      if (prompts.title_prompt !== settings.title_prompt) return true;
-      if (prompts.query_prompt !== settings.query_prompt) return true;
+      if (PROMPT_FIELDS.some(key => prompts[key] !== settings[key])) return true;
 
       // Note: API keys are auto-saved on test, so we don't check them here
 
@@ -337,9 +344,20 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
   const loadSettings = async () => {
     try {
       const data = await api.getSettings();
+      let defaults = {};
+      if (PROMPT_FIELDS.some(key => isBlankPrompt(data[key]))) {
+        defaults = await api.getDefaultSettings();
+      }
+      const normalizedPrompts = Object.fromEntries(
+        PROMPT_FIELDS.map(key => [
+          key,
+          isBlankPrompt(data[key]) ? (defaults[key] || '') : data[key],
+        ])
+      );
+      const normalizedData = { ...data, ...normalizedPrompts };
 
       // Set settings immediately to show UI
-      setSettings(data);
+      setSettings(normalizedData);
 
       setSelectedSearchProvider(data.search_provider || 'duckduckgo');
       setSearchKeywordExtraction(data.search_keyword_extraction || 'direct');
@@ -413,13 +431,7 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
       // API key is not sent to frontend for security, similar to other keys
 
       // Prompts
-      setPrompts({
-        stage1_prompt: data.stage1_prompt || '',
-        stage2_prompt: data.stage2_prompt || '',
-        stage3_prompt: data.stage3_prompt || '',
-        title_prompt: data.title_prompt || '',
-        query_prompt: data.query_prompt || '',
-      });
+      setPrompts(normalizedPrompts);
 
       // Clear Direct Keys (for security)
       setDirectKeys({
@@ -1015,7 +1027,6 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
       setStage2Temperature(0.3);
 
       // Reset filters to 'remote' default
-      // Reset filters to 'remote' default
       setCouncilMemberFilters({ 0: 'remote', 1: 'remote' });
       setChairmanFilter('remote');
 
@@ -1028,12 +1039,8 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
 
       // 4. Reset Prompts to System Defaults (keep these useful)
       const defaults = await api.getDefaultSettings();
-      setPrompts({
-        stage1_prompt: defaults.stage1_prompt,
-        stage2_prompt: defaults.stage2_prompt,
-        stage3_prompt: defaults.stage3_prompt,
-
-      });
+      const defaultPrompts = buildPromptValues(defaults);
+      setPrompts(defaultPrompts);
 
       // 5. Save the reset settings to backend
       const updates = {
@@ -1062,9 +1069,7 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
         council_member_filters: { 0: 'remote', 1: 'remote' },
         chairman_filter: 'remote',
         search_query_filter: 'remote',
-        stage1_prompt: defaults.stage1_prompt,
-        stage2_prompt: defaults.stage2_prompt,
-        stage3_prompt: defaults.stage3_prompt,
+        ...defaultPrompts,
       };
       await api.updateSettings(updates);
 
@@ -1497,7 +1502,13 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
               className={`sidebar-nav-item ${activeSection === 'prompts' ? 'active' : ''}`}
               onClick={() => setActiveSection('prompts')}
             >
-              System Prompts
+              Council System Prompts
+            </button>
+            <button
+              className={`sidebar-nav-item ${activeSection === 'advisor_prompts' ? 'active' : ''}`}
+              onClick={() => setActiveSection('advisor_prompts')}
+            >
+              Advisor System Prompts
             </button>
             <button
               className={`sidebar-nav-item ${activeSection === 'search' ? 'active' : ''}`}
@@ -1607,6 +1618,7 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
             {/* SYSTEM PROMPTS */}
             {activeSection === 'prompts' && (
               <PromptSettings
+                variant="council"
                 prompts={prompts}
                 handlePromptChange={handlePromptChange}
                 handleResetPrompt={handleResetPrompt}
@@ -1614,6 +1626,18 @@ export default function Settings({ onClose, ollamaStatus, onRefreshOllama, initi
                 setActivePromptTab={setActivePromptTab}
                 stage2Temperature={stage2Temperature}
                 setStage2Temperature={setStage2Temperature}
+              />
+            )}
+
+            {/* ADVISOR SYSTEM PROMPTS */}
+            {activeSection === 'advisor_prompts' && (
+              <PromptSettings
+                variant="advisor"
+                prompts={prompts}
+                handlePromptChange={handlePromptChange}
+                handleResetPrompt={handleResetPrompt}
+                activePromptTab={activeAdvisorPromptTab}
+                setActivePromptTab={setActiveAdvisorPromptTab}
               />
             )}
 

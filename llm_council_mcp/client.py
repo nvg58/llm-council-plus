@@ -235,7 +235,7 @@ class CouncilClient:
         persona_ids: list[str],
         default_model: str | None = None,
         model_assignments: dict | None = None,
-        max_rounds: int = 2,
+        max_rounds: int = 3,
         search_provider: str | None = None,
     ) -> AsyncIterator[dict]:
         """Stream SSE events from an advisor debate.

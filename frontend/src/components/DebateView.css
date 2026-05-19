@@ -61,10 +61,10 @@
 
 .debate-view__question-text {
   font-family: var(--font-content);
-  font-size: 15px;
+  font-size: 16px;
   color: var(--text-primary);
   margin: 0;
-  line-height: 1.6;
+  line-height: 1.65;
 }
 
 /* ── Live Indicator (before first response) ── */

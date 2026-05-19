@@ -82,7 +82,7 @@ export default function LandingPage({ onSelectMode }) {
                   They reach consensus or vote, delivering a structured verdict.
                 </p>
                 <ul className="landing-card__features">
-                  <li>10 distinct advisor personas</li>
+                  <li>12 distinct advisor personas</li>
                   <li>Configurable debate rounds</li>
                   <li>Structured verdict & action plan</li>
                 </ul>

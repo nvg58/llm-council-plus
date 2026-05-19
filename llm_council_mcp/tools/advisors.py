@@ -8,16 +8,20 @@ from typing import Any
 from ..client import CouncilClient
 from ..stream_buffer import buffer_debate
 
+VALID_PERSONA_IDS = (
+    "skeptic, pragmatist, innovator, historian, ethicist, analyst, contrarian, "
+    "strategist, humanist, risk-assessor, comedian, economist"
+)
+
 
 def register(server: Any, base_url: str) -> None:
     """Register advisor and persona management tools on the MCP server."""
 
     @server.tool(description=(
-        "List all available advisor personas. Returns all 10 built-in personas with any "
+        "List all available advisor personas. Returns all 12 built-in personas with any "
         "user customizations applied. Each persona has: id, name, role, description, "
         "system_prompt, avatar_emoji, color, is_customized. "
-        "Persona IDs: skeptic, pragmatist, innovator, historian, ethicist, analyst, "
-        "contrarian, strategist, humanist, risk-assessor."
+        f"Persona IDs: {VALID_PERSONA_IDS}."
     ))
     async def list_personas() -> str:
         try:
@@ -29,8 +33,7 @@ def register(server: Any, base_url: str) -> None:
 
     @server.tool(description=(
         "Get a single advisor persona by ID. Returns full persona details including "
-        "system_prompt. Valid IDs: skeptic, pragmatist, innovator, historian, ethicist, "
-        "analyst, contrarian, strategist, humanist, risk-assessor."
+        f"system_prompt. Valid IDs: {VALID_PERSONA_IDS}."
     ))
     async def get_persona(persona_id: str) -> str:
         try:
@@ -38,7 +41,7 @@ def register(server: Any, base_url: str) -> None:
                 personas = await client.get_personas()
             match = next((p for p in personas if p["id"] == persona_id), None)
             if match is None:
-                return f"Persona '{persona_id}' not found. Valid IDs: skeptic, pragmatist, innovator, historian, ethicist, analyst, contrarian, strategist, humanist, risk-assessor."
+                return f"Persona '{persona_id}' not found. Valid IDs: {VALID_PERSONA_IDS}."
             return json.dumps(match, indent=2)
         except Exception as exc:
             return f"Error fetching persona: {exc}"
@@ -105,7 +108,7 @@ def register(server: Any, base_url: str) -> None:
                 "advisor_default_model": settings.get("advisor_default_model", ""),
                 "advisor_tiebreaker_model": settings.get("advisor_tiebreaker_model", ""),
                 "advisor_temperature": settings.get("advisor_temperature", 0.7),
-                "advisor_default_rounds": settings.get("advisor_default_rounds", 2),
+                "advisor_default_rounds": settings.get("advisor_default_rounds", 3),
             }
             return json.dumps(config, indent=2)
         except Exception as exc:
@@ -116,7 +119,7 @@ def register(server: Any, base_url: str) -> None:
         "default_model: model used for all advisor personas when no per-persona assignment is given. "
         "tiebreaker_model: model used for tiebreaker and verdict synthesis (falls back to default_model if empty). "
         "temperature: LLM temperature for advisor calls (0.0–2.0, default 0.7). "
-        "default_rounds: default number of debate rounds (1–10, default 2)."
+        "default_rounds: default number of debate rounds (3–10, default 3)."
     ))
     async def configure_advisors(
         default_model: str | None = None,
@@ -132,6 +135,8 @@ def register(server: Any, base_url: str) -> None:
         if temperature is not None:
             updates["advisor_temperature"] = temperature
         if default_rounds is not None:
+            if not 3 <= default_rounds <= 10:
+                return "Error: default_rounds must be between 3 and 10."
             updates["advisor_default_rounds"] = default_rounds
 
         if not updates:
@@ -153,12 +158,11 @@ def register(server: Any, base_url: str) -> None:
         "Returns rounds of responses, the verdict, and optionally a tiebreaker. "
         "\n\n"
         "persona_ids: 2–4 persona IDs to participate. "
-        "Valid IDs: skeptic, pragmatist, innovator, historian, ethicist, analyst, "
-        "contrarian, strategist, humanist, risk-assessor. "
+        f"Valid IDs: {VALID_PERSONA_IDS}. "
         "\n\n"
         "default_model: model for all advisors (uses saved advisor_default_model if omitted). "
         "model_assignments: per-persona model overrides, e.g. {\"skeptic\": \"openai:gpt-4.1\"}. "
-        "max_rounds: number of debate rounds (1–10, default 2). "
+        "max_rounds: number of debate rounds (3–10, default 3). "
         "search_provider: enable web search context — one of: duckduckgo, tavily, brave, serper, tinyfish. "
         "\n\n"
         "The result includes conversation_id so you can retrieve the full conversation later."
@@ -168,15 +172,15 @@ def register(server: Any, base_url: str) -> None:
         persona_ids: list[str],
         default_model: str | None = None,
         model_assignments: dict | None = None,
-        max_rounds: int = 2,
+        max_rounds: int = 3,
         search_provider: str | None = None,
     ) -> str:
         if len(persona_ids) < 2:
             return "Error: at least 2 persona_ids are required."
         if len(persona_ids) > 4:
             return "Error: at most 4 persona_ids are supported."
-        if not 1 <= max_rounds <= 10:
-            return "Error: max_rounds must be between 1 and 10."
+        if not 3 <= max_rounds <= 10:
+            return "Error: max_rounds must be between 3 and 10."
 
         try:
             async with CouncilClient(base_url) as client:

@@ -442,7 +442,7 @@ async def get_conversation(conv_id, base_url="http://localhost:8001"):
 ### 14. List and Inspect Personas
 
 ```bash
-# List all 10 personas with current customizations
+# List all 12 personas with current customizations
 curl http://localhost:8001/api/personas | python3 -m json.tool
 
 # Each persona has: id, name, role, description, system_prompt, avatar_emoji, color, is_customized
@@ -457,7 +457,7 @@ async def get_persona(persona_id, base_url="http://localhost:8001"):
     return next((p for p in personas if p["id"] == persona_id), None)
 ```
 
-**Built-in persona IDs:** `skeptic`, `pragmatist`, `innovator`, `historian`, `ethicist`, `analyst`, `contrarian`, `strategist`, `humanist`, `risk-assessor`
+**Built-in persona IDs:** `skeptic`, `pragmatist`, `innovator`, `historian`, `ethicist`, `analyst`, `contrarian`, `strategist`, `humanist`, `risk-assessor`, `comedian`, `economist`
 
 ---
 
@@ -498,7 +498,7 @@ async def run_advisor_debate(
     question: str,
     persona_ids: list[str],           # 2-4 required
     default_model: str,
-    max_rounds: int = 2,
+    max_rounds: int = 3,
     search_provider: str | None = None,
     base_url: str = "http://localhost:8001",
 ) -> dict:
@@ -533,7 +533,7 @@ result = asyncio.run(run_advisor_debate(
     question="Should we rewrite this service in Rust?",
     persona_ids=["skeptic", "pragmatist", "innovator"],
     default_model="openai:gpt-4.1",
-    max_rounds=2,
+    max_rounds=3,
 ))
 print("Consensus:", result["consensus_reached"])
 print("Verdict:", result["verdict"]["content"])
@@ -547,7 +547,7 @@ print("Verdict:", result["verdict"]["content"])
 | `persona_ids` | array | Yes | — | 2–4 persona IDs |
 | `default_model` | string | No | `advisor_default_model` setting | Model for all advisors |
 | `model_assignments` | object | No | — | Per-persona overrides: `{"skeptic": "openai:gpt-4.1"}` |
-| `max_rounds` | integer | No | `advisor_default_rounds` setting | Number of rounds (1–10) |
+| `max_rounds` | integer | No | `advisor_default_rounds` setting | Number of rounds (3–10) |
 | `web_search` | boolean | No | `false` | Enable web search context |
 | `search_provider` | string | No | — | `duckduckgo`, `tavily`, `brave`, `serper`, `tinyfish` |
 
@@ -558,13 +558,25 @@ print("Verdict:", result["verdict"]["content"])
   "rounds": [
     {
       "round_number": 1,
+      "average_consensus_score": 2.33,
       "responses": [
         {"persona_id": "skeptic", "persona_name": "The Skeptic", "model": "openai:gpt-4.1",
-         "content": "I question whether Rust's learning curve justifies the rewrite..."}
+         "content": "I question whether Rust's learning curve justifies the rewrite...",
+         "consensus": false,
+         "consensus_score": 2}
       ]
     }
   ],
   "consensus_reached": false,
+  "consensus_round": null,
+  "round_extracts": [
+    {
+      "round_number": 1,
+      "model": "openai:gpt-4.1",
+      "content": "Advisor: The Skeptic\nOverall position: ...\nStrongest claims:\n- ...",
+      "error": null
+    }
+  ],
   "tiebreaker": null,
   "verdict": {
     "model": "openai:gpt-4.1",
@@ -611,7 +623,7 @@ curl -X POST "http://localhost:8001/api/conversations/$CONV_ID/debate/stream" \
       "pragmatist": "openai:gpt-4.1",
       "innovator": "custom:moonshotai/kimi-k2.6"
     },
-    "max_rounds": 2
+    "max_rounds": 3
   }'
 ```
 
@@ -627,7 +639,7 @@ curl -X PUT http://localhost:8001/api/settings \
     "advisor_default_model": "openai:gpt-4.1",
     "advisor_tiebreaker_model": "anthropic:claude-sonnet-4-6",
     "advisor_temperature": 0.7,
-    "advisor_default_rounds": 2
+    "advisor_default_rounds": 3
   }'
 ```
 
@@ -638,7 +650,7 @@ curl -X PUT http://localhost:8001/api/settings \
 | `advisor_default_model` | `""` | Model for all advisors when no per-persona assignment given |
 | `advisor_tiebreaker_model` | `""` | Model for tiebreaker + verdict synthesis (falls back to `advisor_default_model`) |
 | `advisor_temperature` | `0.7` | LLM temperature for advisor calls |
-| `advisor_default_rounds` | `2` | Default number of debate rounds (1–10) |
+| `advisor_default_rounds` | `3` | Default number of debate rounds (3–10) |
 
 ---
 

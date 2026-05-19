@@ -357,7 +357,7 @@ export const api = {
       persona_ids: options.personaIds,
       model_assignments: options.modelAssignments || null,
       default_model: options.defaultModel || null,
-      max_rounds: options.maxRounds || 2,
+      max_rounds: options.maxRounds || 3,
       search_provider: options.searchProvider || null,
     };
 

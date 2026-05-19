@@ -218,7 +218,7 @@ async def test_reset_persona_not_found_raises():
 @pytest.mark.asyncio
 async def test_stream_debate_yields_events():
     events_data = [
-        {"type": "advisor_debate_start", "data": {"personas": [], "max_rounds": 1, "question": "Q?", "web_search": False}},
+        {"type": "advisor_debate_start", "data": {"personas": [], "max_rounds": 3, "question": "Q?", "web_search": False}},
         {"type": "advisor_complete", "data": {"rounds": [], "consensus_reached": False, "verdict": None, "tiebreaker": None, "personas": []}},
     ]
     sse_body = "".join(f"data: {json.dumps(e)}\n\n" for e in events_data)
