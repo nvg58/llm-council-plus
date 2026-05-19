@@ -270,6 +270,7 @@ def add_advisor_message(
     rounds: List[Dict[str, Any]],
     verdict: Optional[Dict[str, Any]] = None,
     tiebreaker: Optional[Dict[str, Any]] = None,
+    personas: Optional[List[Dict[str, Any]]] = None,
     metadata: Optional[Dict[str, Any]] = None,
     conversation: Optional[Dict[str, Any]] = None
 ):
@@ -294,6 +295,8 @@ def add_advisor_message(
         "rounds": rounds,
     }
 
+    if personas is not None:
+        message["personas"] = personas
     if verdict is not None:
         message["verdict"] = verdict
     if tiebreaker is not None:

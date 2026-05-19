@@ -1,6 +1,6 @@
 ---
 name: llm-council-api
-version: 1.0.0
+version: 0.5.0
 description: Use when interacting with LLM Council Plus via HTTP API — configuring the council, running deliberations, listing models, or managing conversations — especially when the MCP server is unavailable, connection is stale, or direct REST access is preferred. Triggers on requests like "ask the council", "configure models", "run a deliberation", "check council health", or any manipulation of the LLM Council Plus system.
 ---
 

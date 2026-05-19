@@ -321,6 +321,7 @@ function App() {
         currentRound: 0,
         maxRounds: options.maxRounds || 2,
         question: options.question,
+        webSearch: options.searchProvider || null,
         personas: [],
         rounds: [],
         verdict: null,
@@ -348,8 +349,8 @@ function App() {
                 const lastMsg = messages[messages.length - 1];
                 messages[messages.length - 1] = {
                   ...lastMsg,
-                  personas: event.personas || [],
-                  maxRounds: event.max_rounds || lastMsg.maxRounds,
+                  personas: event.data?.personas || [],
+                  maxRounds: event.data?.max_rounds || lastMsg.maxRounds,
                 };
                 return { ...prev, messages };
               });
@@ -920,6 +921,24 @@ function App() {
     setSidebarOpen(false); // Close sidebar on mobile after creating new conversation
   };
 
+  const resetAppState = (mode) => {
+    if (advisorAbortControllerRef.current) {
+      advisorAbortControllerRef.current.abort();
+      advisorAbortControllerRef.current = null;
+    }
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsLoading(false);
+    setCurrentConversationId(null);
+    setCurrentConversation(null);
+    setAppMode(mode);
+    setSidebarOpen(false);
+  };
+
+  const handleMobileNewAdvisors = () => resetAppState('advisors');
+
   const handleMobileOpenSettings = () => {
     setShowSettings(true);
     setSidebarOpen(false); // Close sidebar on mobile
@@ -941,21 +960,14 @@ function App() {
         currentConversationId={currentConversationId}
         onSelectConversation={handleMobileSelectConversation}
         onNewConversation={handleMobileNewConversation}
+        onNewAdvisors={handleMobileNewAdvisors}
         onDeleteConversation={handleDeleteConversation}
         onOpenSettings={handleMobileOpenSettings}
         isLoading={isLoading}
         onAbort={handleAbort}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
-        onGoHome={() => {
-          if (advisorAbortControllerRef.current) advisorAbortControllerRef.current.abort();
-          if (abortControllerRef.current) abortControllerRef.current.abort();
-          setIsLoading(false);
-          setAppMode(null);
-          setCurrentConversationId(null);
-          setCurrentConversation(null);
-          setSidebarOpen(false);
-        }}
+        onGoHome={() => resetAppState(null)}
       />
 
       <div className="main-area">

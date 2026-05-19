@@ -317,6 +317,74 @@ export default function AdvisorSetup({
         </div>
       </div>
 
+      {/* Model Assignment */}
+      <div className="advisor-setup__section">
+        <div className="advisor-setup__section-header">
+          <span className="advisor-setup__section-label">Model Assignment</span>
+          <div className="advisor-setup__mode-tabs">
+            <button
+              type="button"
+              className={`advisor-setup__mode-tab ${modelMode === 'simple' ? 'advisor-setup__mode-tab--active' : ''}`}
+              onClick={() => setModelMode('simple')}
+            >
+              Simple
+            </button>
+            <button
+              type="button"
+              className={`advisor-setup__mode-tab ${modelMode === 'advanced' ? 'advisor-setup__mode-tab--active' : ''}`}
+              onClick={() => setModelMode('advanced')}
+            >
+              Advanced
+            </button>
+          </div>
+        </div>
+
+        {modelMode === 'simple' ? (
+          <div className="advisor-setup__model-simple">
+            <label className="advisor-setup__model-label">
+              All advisors use the same model
+            </label>
+            <SearchableModelSelect
+              models={models}
+              value={chosenModel}
+              onChange={handleSimpleModelChange}
+              placeholder={modelsLoading ? 'Loading models…' : `Search ${models.length} models…`}
+              isLoading={modelsLoading}
+              isDisabled={modelsLoading}
+            />
+          </div>
+        ) : (
+          <div className="advisor-setup__model-advanced">
+            {selectedPersonaIds.length === 0 ? (
+              <p className="advisor-setup__model-advanced-empty">
+                Select at least one advisor above to assign models.
+              </p>
+            ) : (
+              selectedPersonaIds.map((id) => {
+                const persona = personas.find((p) => p.id === id);
+                if (!persona) return null;
+                return (
+                  <div key={id} className="advisor-setup__model-row">
+                    <span className="advisor-setup__model-row-persona">
+                      <span>{persona.avatar_emoji}</span>
+                      <span>{persona.name}</span>
+                    </span>
+                    <SearchableModelSelect
+                      models={models}
+                      value={modelAssignments[id] || ''}
+                      onChange={(modelId) => handleModelAssignment(id, modelId)}
+                      placeholder={modelsLoading ? 'Loading…' : 'Search models…'}
+                      isLoading={modelsLoading}
+                      isDisabled={modelsLoading}
+                    />
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
+      </div>
+
       {/* Persona Gallery */}
       <div className="advisor-setup__section">
         <button
@@ -397,74 +465,6 @@ export default function AdvisorSetup({
             )}
           </div>
         </div>
-      </div>
-
-      {/* Model Assignment */}
-      <div className="advisor-setup__section">
-        <div className="advisor-setup__section-header">
-          <span className="advisor-setup__section-label">Model Assignment</span>
-          <div className="advisor-setup__mode-tabs">
-            <button
-              type="button"
-              className={`advisor-setup__mode-tab ${modelMode === 'simple' ? 'advisor-setup__mode-tab--active' : ''}`}
-              onClick={() => setModelMode('simple')}
-            >
-              Simple
-            </button>
-            <button
-              type="button"
-              className={`advisor-setup__mode-tab ${modelMode === 'advanced' ? 'advisor-setup__mode-tab--active' : ''}`}
-              onClick={() => setModelMode('advanced')}
-            >
-              Advanced
-            </button>
-          </div>
-        </div>
-
-        {modelMode === 'simple' ? (
-          <div className="advisor-setup__model-simple">
-            <label className="advisor-setup__model-label">
-              All advisors use the same model
-            </label>
-            <SearchableModelSelect
-              models={models}
-              value={chosenModel}
-              onChange={handleSimpleModelChange}
-              placeholder={modelsLoading ? 'Loading models…' : `Search ${models.length} models…`}
-              isLoading={modelsLoading}
-              isDisabled={modelsLoading}
-            />
-          </div>
-        ) : (
-          <div className="advisor-setup__model-advanced">
-            {selectedPersonaIds.length === 0 ? (
-              <p className="advisor-setup__model-advanced-empty">
-                Select at least one advisor above to assign models.
-              </p>
-            ) : (
-              selectedPersonaIds.map((id) => {
-                const persona = personas.find((p) => p.id === id);
-                if (!persona) return null;
-                return (
-                  <div key={id} className="advisor-setup__model-row">
-                    <span className="advisor-setup__model-row-persona">
-                      <span>{persona.avatar_emoji}</span>
-                      <span>{persona.name}</span>
-                    </span>
-                    <SearchableModelSelect
-                      models={models}
-                      value={modelAssignments[id] || ''}
-                      onChange={(modelId) => handleModelAssignment(id, modelId)}
-                      placeholder={modelsLoading ? 'Loading…' : 'Search models…'}
-                      isLoading={modelsLoading}
-                      isDisabled={modelsLoading}
-                    />
-                  </div>
-                );
-              })
-            )}
-          </div>
-        )}
       </div>
 
       {/* Edit Persona Modal */}

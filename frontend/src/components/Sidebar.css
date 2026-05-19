@@ -95,47 +95,80 @@
   cursor: not-allowed;
 }
 
-/* Action Buttons Row */
+/* Action Buttons */
 .sidebar-actions {
   padding: 12px 16px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   display: flex;
-  gap: 8px;
+  flex-direction: column;
+  gap: 6px;
 }
 
-.new-council-btn {
-  flex: 1;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: var(--text-secondary);
+.sidebar-action-row {
+  display: flex;
+  gap: 6px;
+}
+
+.sidebar-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   padding: 9px 14px;
   border-radius: 10px;
   font-family: var(--font-ui);
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+  border: 1px solid transparent;
+  width: 100%;
 }
 
-.new-council-btn:hover:not(:disabled) {
-  background: rgba(59, 130, 246, 0.1);
-  border-color: rgba(59, 130, 246, 0.3);
-  color: #60a5fa;
-}
-
-.new-council-btn:disabled {
+.sidebar-action-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
 
-.home-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.07);
-  border-color: rgba(255, 255, 255, 0.15);
+/* Home — full-width neutral */
+.sidebar-action-btn--home {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: var(--text-secondary);
+}
+
+.sidebar-action-btn--home:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.18);
   color: var(--text-primary);
+}
+
+/* New Council — blue */
+.sidebar-action-btn--council {
+  background: rgba(59, 130, 246, 0.08);
+  border-color: rgba(59, 130, 246, 0.25);
+  color: #60a5fa;
+}
+
+.sidebar-action-btn--council:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.16);
+  border-color: rgba(59, 130, 246, 0.45);
+  color: #93c5fd;
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.2);
+}
+
+/* New Advisors — purple */
+.sidebar-action-btn--advisors {
+  background: rgba(139, 92, 246, 0.08);
+  border-color: rgba(139, 92, 246, 0.25);
+  color: #a78bfa;
+}
+
+.sidebar-action-btn--advisors:hover {
+  background: rgba(139, 92, 246, 0.16);
+  border-color: rgba(139, 92, 246, 0.45);
+  color: #c4b5fd;
+  box-shadow: 0 0 10px rgba(139, 92, 246, 0.2);
 }
 
 .btn-icon {

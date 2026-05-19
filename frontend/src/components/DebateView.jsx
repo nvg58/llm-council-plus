@@ -1,6 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import AdvisorGrid from './AdvisorGrid';
+
+const REMARK_PLUGINS = [remarkGfm];
 import './DebateView.css';
 
 const toStr = (v) => (typeof v === 'string' ? v : String(v || ''));
@@ -21,25 +24,29 @@ function RoundSection({ roundIndex, roundData, personas, isLast, isRunning }) {
 
       <div className="debate-view__round-cards">
         {responses.map((resp, idx) => {
-          const persona = findPersona(personas, resp.personaId);
+          const persona = findPersona(personas, resp.persona_id);
           const hasError = !!resp.error;
+          const displayName = persona?.name || resp.persona_name || resp.persona_id || 'Unknown';
+          const displayEmoji = persona?.avatar_emoji || '🤖';
+          const displayRole = persona?.role || '';
+          const displayColor = persona?.color || '#64748b';
 
           return (
             <div
               key={idx}
               className="debate-view__response-card"
-              style={{ '--persona-color': persona?.color || '#64748b' }}
+              style={{ '--persona-color': displayColor }}
             >
               <div className="debate-view__response-header">
                 <span className="debate-view__response-emoji">
-                  {persona?.avatar_emoji || '🤖'}
+                  {displayEmoji}
                 </span>
                 <div className="debate-view__response-meta">
                   <span className="debate-view__response-name">
-                    {persona?.name || resp.personaId}
+                    {displayName}
                   </span>
                   <span className="debate-view__response-role">
-                    {persona?.role || ''}
+                    {displayRole}
                   </span>
                 </div>
                 {hasError && (
@@ -50,11 +57,16 @@ function RoundSection({ roundIndex, roundData, personas, isLast, isRunning }) {
                 {hasError ? (
                   <div className="debate-view__response-error">
                     <span>⚠️</span>
-                    <span>{resp.error_message || 'This advisor failed to respond.'}</span>
+                    <div className="debate-view__response-error-detail">
+                      <span>{resp.error || 'This advisor failed to respond.'}</span>
+                      {resp.model && (
+                        <span className="debate-view__response-error-model">Model: {resp.model}</span>
+                      )}
+                    </div>
                   </div>
                 ) : (
                   <div className="markdown-content">
-                    <ReactMarkdown>{toStr(resp.content)}</ReactMarkdown>
+                    <ReactMarkdown remarkPlugins={REMARK_PLUGINS}>{toStr(resp.content)}</ReactMarkdown>
                   </div>
                 )}
               </div>
@@ -89,6 +101,7 @@ export default function DebateView({
   maxRounds = 3,
   isRunning = false,
   question = '',
+  webSearch = null,
   error = null,
 }) {
   const [verdictCopied, setVerdictCopied] = useState(false);
@@ -100,7 +113,7 @@ export default function DebateView({
     const responses = currentRoundData.responses || [];
     if (responses.length > 0) {
       const last = responses[responses.length - 1];
-      if (!last.done) return last.personaId;
+      if (!last.done) return last.persona_id;
     }
     return null;
   }, [isRunning, rounds, currentRound]);
@@ -133,7 +146,14 @@ export default function DebateView({
       {/* Question echo */}
       {question && (
         <div className="debate-view__question">
-          <span className="debate-view__question-label">Debating</span>
+          <div className="debate-view__question-top">
+            <span className="debate-view__question-label">Debating</span>
+            {webSearch && (
+              <span className={`debate-view__search-badge ${showDebateStarting ? 'debate-view__search-badge--searching' : ''}`}>
+                {showDebateStarting ? '🌐 Searching the web...' : '🌐 Web search included'}
+              </span>
+            )}
+          </div>
           <p className="debate-view__question-text">{question}</p>
         </div>
       )}
@@ -184,7 +204,7 @@ export default function DebateView({
             )}
           </div>
           <div className="markdown-content">
-            <ReactMarkdown>{toStr(tiebreaker.content)}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={REMARK_PLUGINS}>{toStr(tiebreaker.content)}</ReactMarkdown>
           </div>
         </div>
       )}
@@ -226,7 +246,7 @@ export default function DebateView({
             )}
           </div>
           <div className="debate-view__verdict-body markdown-content">
-            <ReactMarkdown>{toStr(verdict.content)}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={REMARK_PLUGINS}>{toStr(verdict.content)}</ReactMarkdown>
           </div>
         </div>
       )}

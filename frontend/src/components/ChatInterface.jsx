@@ -1,6 +1,9 @@
 import StageTimer from './StageTimer';
 import { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+
+const REMARK_PLUGINS = [remarkGfm];
 import SearchContext from './SearchContext';
 import Stage1, { Stage1Skeleton } from './Stage1';
 import Stage2, { Stage2Skeleton } from './Stage2';
@@ -142,7 +145,7 @@ export default function ChatInterface({
                             <div className="message-content">
                                 {msg.role === 'user' ? (
                                     <div className="markdown-content">
-                                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                                        <ReactMarkdown remarkPlugins={REMARK_PLUGINS}>{msg.content}</ReactMarkdown>
                                     </div>
                                 ) : (msg.mode === 'advisors' || msg.type === 'advisor_debate') ? (
                                     <DebateView
@@ -154,6 +157,7 @@ export default function ChatInterface({
                                         maxRounds={msg.maxRounds || msg.metadata?.max_rounds || 2}
                                         isRunning={msg.isRunning || false}
                                         question={msg.question || ''}
+                                        webSearch={msg.webSearch}
                                         error={msg.error || null}
                                     />
                                 ) : (

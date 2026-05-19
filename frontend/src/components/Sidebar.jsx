@@ -6,6 +6,7 @@ export default function Sidebar({
   currentConversationId,
   onSelectConversation,
   onNewConversation,
+  onNewAdvisors,
   onDeleteConversation,
   onOpenSettings,
   isLoading,
@@ -60,7 +61,7 @@ export default function Sidebar({
         <div className="sidebar-title-wrapper">
           <div className="sidebar-title">LLM Council <span className="title-plus">Plus</span></div>
           <div className="sidebar-subtitle">Created by: Jacob Ben-David</div>
-          <div className="sidebar-version">v1.0.0</div>
+          <div className="sidebar-version">v0.5.0</div>
         </div>
         <button
           className="icon-button"
@@ -73,22 +74,28 @@ export default function Sidebar({
 
       {/* Mode Actions */}
       <div className="sidebar-actions">
-        <button
-          className="new-council-btn home-btn"
-          onClick={onGoHome}
-          title="Choose mode"
-        >
+        <button className="sidebar-action-btn sidebar-action-btn--home" onClick={onGoHome}>
           <span className="btn-icon">⌂</span>
           <span className="btn-text">Home</span>
         </button>
-        <button
-          className="new-council-btn"
-          onClick={onNewConversation}
-          disabled={isLoading}
-        >
-          <span className="btn-icon">+</span>
-          <span className="btn-text">New</span>
-        </button>
+        <div className="sidebar-action-row">
+          <button
+            className="sidebar-action-btn sidebar-action-btn--council"
+            onClick={onNewConversation}
+            disabled={isLoading}
+          >
+            <span className="btn-icon">+</span>
+            <span className="btn-text">New Council</span>
+          </button>
+          <button
+            className="sidebar-action-btn sidebar-action-btn--advisors"
+            onClick={onNewAdvisors}
+            disabled={isLoading}
+          >
+            <span className="btn-icon">+</span>
+            <span className="btn-text">New Advisors</span>
+          </button>
+        </div>
       </div>
 
       {/* Search Input */}

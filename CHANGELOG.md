@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.0.0] - 2026-05-18
+## [0.5.0] - 2026-05-18
 
 ### Added
 - **LLM Advisors mode**: Entirely new persona-driven debate system where named advisor personas argue your question across configurable rounds, reaching consensus or voting to deliver a structured verdict with action plan
@@ -32,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **CouncilGrid provider detection**: NVIDIA prefix (`nvidia:`) added to provider icon lookup chain
 - **Settings UI**: NVIDIA API key section added to Provider Settings with test/save flow
 - **`ChatInterface`**: Extended to support both council and advisor question submission flows
-- **`llm-council-api` skill updated to v1.0.0**: Documents advisor endpoints, persona API, NVIDIA provider, and dual-mode architecture
+- **`llm-council-api` skill updated to v0.5.0**: Documents advisor endpoints, persona API, NVIDIA provider, and dual-mode architecture
 
 ## [0.4.2] - 2026-05-15
 

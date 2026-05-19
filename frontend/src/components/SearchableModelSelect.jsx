@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import Select from 'react-select';
 
 /**
@@ -80,8 +81,7 @@ export default function SearchableModelSelect({
     }
   }
 
-  // Custom styles to match the dark theme
-  const customStyles = {
+  const customStyles = useMemo(() => ({
     control: (base, state) => ({
       ...base,
       backgroundColor: 'rgba(30, 41, 59, 0.8)',
@@ -100,6 +100,7 @@ export default function SearchableModelSelect({
       border: '1px solid rgba(148, 163, 184, 0.2)',
       boxShadow: '0 10px 40px rgba(0, 0, 0, 0.5)',
       zIndex: 100,
+      minWidth: '360px',
     }),
     menuPortal: (base) => ({
       ...base,
@@ -183,7 +184,7 @@ export default function SearchableModelSelect({
       ...base,
       color: '#64748b',
     }),
-  };
+  }), []);
 
   return (
     <Select

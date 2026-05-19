@@ -599,6 +599,7 @@ async def start_debate_stream(conversation_id: str, body: StartDebateRequest, re
                     all_rounds = event["data"]["rounds"]
                     verdict_data = event["data"]["verdict"]
                     tiebreaker_data = event["data"].get("tiebreaker")
+                    saved_personas = event["data"].get("personas", [])
 
                 yield f"data: {json.dumps(event)}\n\n"
 
@@ -617,6 +618,7 @@ async def start_debate_stream(conversation_id: str, body: StartDebateRequest, re
                 rounds=all_rounds,
                 verdict=verdict_data,
                 tiebreaker=tiebreaker_data,
+                personas=saved_personas,
                 metadata=metadata,
                 conversation=conversation,
             )

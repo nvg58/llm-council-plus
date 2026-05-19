@@ -141,6 +141,7 @@ async def run_debate(
         return
 
     personas_map = {p.id: p for p in personas_list}
+    personas_serialized = [p.model_dump() for p in personas_list]
 
     search_context_block = ""
     if search_context:
@@ -153,7 +154,7 @@ async def run_debate(
     yield {
         "type": "advisor_debate_start",
         "data": {
-            "personas": [p.model_dump() for p in personas_list],
+            "personas": personas_serialized,
             "max_rounds": max_rounds,
             "question": question,
             "web_search": web_search,
@@ -320,5 +321,6 @@ async def run_debate(
             "consensus_reached": consensus_reached,
             "tiebreaker": tiebreaker_result,
             "verdict": verdict_data,
+            "personas": personas_serialized,
         },
     }
