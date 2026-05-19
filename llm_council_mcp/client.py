@@ -204,6 +204,66 @@ class CouncilClient:
                     except json.JSONDecodeError:
                         continue
 
+    # ── Personas ──────────────────────────────────────────────────────────────
+
+    async def get_personas(self) -> list[dict]:
+        resp = await self.client.get(f"{self.base_url}/api/personas")
+        resp.raise_for_status()
+        return resp.json()
+
+    async def update_persona(self, persona_id: str, **fields: Any) -> dict:
+        resp = await self.client.patch(
+            f"{self.base_url}/api/personas/{persona_id}",
+            json=fields,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    async def reset_persona(self, persona_id: str) -> dict:
+        resp = await self.client.delete(
+            f"{self.base_url}/api/personas/{persona_id}/override"
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    # ── Advisor Debate ────────────────────────────────────────────────────────
+
+    async def stream_debate(
+        self,
+        conversation_id: str,
+        question: str,
+        persona_ids: list[str],
+        default_model: str | None = None,
+        model_assignments: dict | None = None,
+        max_rounds: int = 2,
+        search_provider: str | None = None,
+    ) -> AsyncIterator[dict]:
+        """Stream SSE events from an advisor debate.
+
+        Yields parsed event dicts. Events include advisor_debate_start,
+        advisor_round_start, advisor_response, advisor_round_complete,
+        advisor_verdict, advisor_complete, and optionally advisor_search_*.
+        """
+        url = f"{self.base_url}/api/conversations/{conversation_id}/debate/stream"
+        payload: dict[str, Any] = {
+            "question": question,
+            "persona_ids": persona_ids,
+            "max_rounds": max_rounds,
+            "web_search": search_provider is not None,
+            "search_provider": search_provider,
+            "default_model": default_model,
+            "model_assignments": model_assignments,
+        }
+        async with self.client.stream("POST", url, json=payload) as resp:
+            resp.raise_for_status()
+            async for line in resp.aiter_lines():
+                if line.startswith("data: "):
+                    raw = line[len("data: "):]
+                    try:
+                        yield json.loads(raw)
+                    except json.JSONDecodeError:
+                        continue
+
     # ── Provider Testing ──────────────────────────────────────────────────────
 
     async def test_provider(self, provider: str, api_key: str | None = None) -> dict:

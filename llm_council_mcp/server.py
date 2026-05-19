@@ -2,6 +2,7 @@
 
 from mcp.server.fastmcp import FastMCP
 
+from .tools import advisors as advisors_tools
 from .tools import conversations as conversations_tools
 from .tools import council as council_tools
 from .tools import deliberation as deliberation_tools
@@ -26,9 +27,12 @@ def create_server(
     server = FastMCP(
         name="llm-council-plus",
         instructions=(
-            "LLM Council Plus — a 3-stage multi-LLM deliberation system. "
-            "Use the council tools to run deliberations, inspect conversations, "
-            "and check system health."
+            "LLM Council Plus — a multi-LLM deliberation and advisor debate system. "
+            "Council mode: 3-stage deliberation (individual responses → peer ranking → synthesis). "
+            "Advisor mode: named personas debate a question across configurable rounds, reaching "
+            "consensus or delivering a structured verdict. "
+            "Use council tools for deliberations, advisor tools for persona-driven debates, "
+            "conversation tools to inspect history, and health tools to check system status."
         ),
         host=host,
         port=port,
@@ -40,6 +44,7 @@ def create_server(
     # Register tools
     council_tools.register(server, base_url)
     deliberation_tools.register(server, base_url)
+    advisors_tools.register(server, base_url)
     conversations_tools.register(server, base_url)
     health_tools.register(server, base_url)
 

@@ -174,6 +174,126 @@ async def buffer_stage2(
     return result, _events_from_list(all_events[remaining_start:])
 
 
+async def buffer_debate(events: AsyncIterator[dict], conversation_id: str) -> dict:
+    """
+    Consume all events from an advisor debate SSE stream.
+
+    Returns a structured dict containing rounds, verdict, tiebreaker, personas,
+    and web-search info. Prefers the authoritative advisor_complete event but
+    falls back to per-event accumulation if the stream ends prematurely.
+    """
+    all_events = await _drain_to_list(events)
+
+    # Accumulated state
+    web_search: dict | None = None
+    search_provider: str | None = None
+    personas: list[dict] = []
+    rounds_acc: dict[int, dict] = {}   # round_number -> {round, responses}
+    tiebreaker: dict | None = None
+    verdict: dict | None = None
+    consensus_reached: bool = False
+    question: str = ""
+
+    for event in all_events:
+        etype = event.get("type")
+
+        if etype == "advisor_search_start":
+            search_provider = event.get("data", {}).get("provider")
+
+        elif etype == "advisor_search_complete":
+            query = event.get("data", {}).get("search_query", "")
+            web_search = {"provider": search_provider or "unknown", "query": query}
+
+        elif etype == "advisor_debate_start":
+            data = event.get("data", {})
+            personas = data.get("personas", [])
+            question = data.get("question", "")
+
+        elif etype == "advisor_round_start":
+            rnum = event.get("data", {}).get("round_number", 1)
+            if rnum not in rounds_acc:
+                rounds_acc[rnum] = {"round": rnum, "responses": []}
+
+        elif etype == "advisor_response":
+            rnum = event.get("round", 1)
+            resp_data = event.get("data", {})
+            if rnum not in rounds_acc:
+                rounds_acc[rnum] = {"round": rnum, "responses": []}
+            rounds_acc[rnum]["responses"].append(resp_data)
+
+        elif etype == "advisor_round_complete":
+            data = event.get("data", {})
+            rnum = data.get("round_number", 1)
+            consensus_reached = data.get("consensus_reached", False)
+            # Authoritative responses for this round
+            rounds_acc[rnum] = {"round": rnum, "responses": data.get("responses", [])}
+
+        elif etype == "advisor_tiebreaker":
+            tiebreaker = event.get("data")
+
+        elif etype == "advisor_verdict":
+            verdict = event.get("data")
+
+        elif etype == "advisor_complete":
+            # Authoritative final event — overrides all accumulated data
+            data = event.get("data", {})
+            stored_rounds = data.get("rounds", [])
+            rounds_acc = {r["round_number"]: {"round": r["round_number"], "responses": r.get("responses", [])}
+                          for r in stored_rounds}
+            consensus_reached = data.get("consensus_reached", False)
+            if data.get("tiebreaker"):
+                tiebreaker = data["tiebreaker"]
+            if data.get("verdict"):
+                verdict = data["verdict"]
+            if data.get("personas"):
+                personas = data["personas"]
+            break
+
+        elif etype == "advisor_error":
+            return {
+                "conversation_id": conversation_id,
+                "status": "error",
+                "error": {
+                    "type": "provider_error",
+                    "message": event.get("message", "Advisor debate failed"),
+                    "retryable": False,
+                },
+            }
+
+    rounds_list = [rounds_acc[k] for k in sorted(rounds_acc)]
+
+    if verdict is None:
+        return {
+            "conversation_id": conversation_id,
+            "status": "error",
+            "error": {
+                "type": "provider_error",
+                "message": "Debate did not produce a verdict",
+                "retryable": True,
+            },
+        }
+
+    verdict_model = verdict.get("model", "unknown") if verdict else "unknown"
+    return {
+        "conversation_id": conversation_id,
+        "question": question,
+        "status": "success",
+        "consensus_reached": consensus_reached,
+        "rounds_completed": len(rounds_list),
+        "web_search": web_search,
+        "personas": personas,
+        "rounds": rounds_list,
+        "tiebreaker": tiebreaker,
+        "verdict": verdict,
+        "summary": {
+            "total_personas": len(personas),
+            "rounds_run": len(rounds_list),
+            "consensus": consensus_reached,
+            "verdict_model": verdict_model,
+        },
+    }
+
+
 async def buffer_stage3(events: AsyncIterator[dict], conversation_id: str) -> dict:
     """
     Consume events until stage3_complete or error, return Stage 3 result dict.
