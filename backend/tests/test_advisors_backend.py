@@ -15,6 +15,7 @@ from backend.advisors import (
     run_debate,
     strip_consensus_tag,
 )
+from backend.model_preflight import ModelPreflightResult
 from backend.personas import DEFAULT_PERSONAS
 
 # Two personas used in most tests
@@ -106,6 +107,63 @@ async def test_run_debate_emits_debate_start_first():
 
     types = [e["type"] for e in events]
     assert types[0] == "advisor_debate_start"
+
+
+@pytest.mark.asyncio
+async def test_run_debate_preflight_failure_stops_before_debate_start():
+    failed = ModelPreflightResult(
+        failures=[{"model": DEFAULT_MODEL, "error": "OpenAI API error: 401"}]
+    )
+
+    with patch("backend.advisors.preflight_models", new_callable=AsyncMock) as mock_preflight:
+        mock_preflight.return_value = failed
+        with patch("backend.advisors._query_advisor", new_callable=AsyncMock) as mock_advisor:
+            events = await _collect_events(run_debate(
+                question="Test?",
+                persona_ids=["skeptic", "pragmatist"],
+                default_model=DEFAULT_MODEL,
+                max_rounds=3,
+                preflight=True,
+            ))
+
+    assert events == [{
+        "type": "advisor_error",
+        "message": "Model preflight failed before starting. One or more selected models are not currently available: openai:gpt-4.1: OpenAI API error: 401",
+    }]
+    mock_advisor.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_run_debate_preflights_assigned_and_tiebreaker_models():
+    responses = {
+        "skeptic": ("Answer. CONSENSUS_SCORE: 5", None),
+        "pragmatist": ("Answer. CONSENSUS_SCORE: 5", None),
+    }
+
+    with patch("backend.advisors.preflight_models", new_callable=AsyncMock) as mock_preflight:
+        mock_preflight.return_value = ModelPreflightResult()
+        with patch("backend.advisors._query_advisor", side_effect=_make_query_advisor(responses)):
+            with patch("backend.advisors._query_neutral", new_callable=AsyncMock) as mock_neutral:
+                mock_neutral.return_value = {"model": DEFAULT_MODEL, "content": "Verdict", "error": None}
+                await _collect_events(run_debate(
+                    question="Test?",
+                    persona_ids=["skeptic", "pragmatist"],
+                    model_assignments={
+                        "skeptic": "openai:gpt-4.1",
+                        "pragmatist": "nvidia:test-model",
+                    },
+                    default_model=DEFAULT_MODEL,
+                    tiebreaker_model="openrouter:test-verdict",
+                    max_rounds=3,
+                    preflight=True,
+                ))
+
+    preflight_models_arg = mock_preflight.await_args.args[0]
+    assert preflight_models_arg == [
+        "openai:gpt-4.1",
+        "nvidia:test-model",
+        "openrouter:test-verdict",
+    ]
 
 
 @pytest.mark.asyncio

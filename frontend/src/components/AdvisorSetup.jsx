@@ -16,6 +16,7 @@ export default function AdvisorSetup({
   const [selectedPersonaIds, setSelectedPersonaIds] = useState([]);
   const [modelMode, setModelMode] = useState('simple');
   const [chosenModel, setChosenModel] = useState('');
+  const [tiebreakerModel, setTiebreakerModel] = useState('');
   const [modelAssignments, setModelAssignments] = useState({});
   const [rounds, setRounds] = useState(3);
   const [editingPersona, setEditingPersona] = useState(null);
@@ -86,6 +87,13 @@ export default function AdvisorSetup({
         } else if (sorted.length > 0) {
           setChosenModel(sorted[0].id);
         }
+        if (settings.advisor_tiebreaker_model) {
+          setTiebreakerModel(settings.advisor_tiebreaker_model);
+        } else if (settings.advisor_default_model) {
+          setTiebreakerModel(settings.advisor_default_model);
+        } else if (sorted.length > 0) {
+          setTiebreakerModel(sorted[0].id);
+        }
 
         if (settings.advisor_default_rounds) {
           setRounds(Math.min(10, Math.max(3, settings.advisor_default_rounds)));
@@ -135,6 +143,19 @@ export default function AdvisorSetup({
 
   const handleModelAssignment = (personaId, modelId) => {
     setModelAssignments((prev) => ({ ...prev, [personaId]: modelId }));
+  };
+
+  const handleTiebreakerModelChange = async (modelId) => {
+    setTiebreakerModel(modelId);
+    try {
+      const currentSettings = await api.getSettings();
+      await api.updateSettings({
+        ...currentSettings,
+        advisor_tiebreaker_model: modelId
+      });
+    } catch (err) {
+      console.error('Failed to auto-save advisor tiebreaker model:', err);
+    }
   };
 
   const handleRoundsStep = (delta) => {
@@ -200,6 +221,7 @@ export default function AdvisorSetup({
       question: question.trim(),
       personaIds: selectedPersonaIds,
       defaultModel: chosenModel,
+      tiebreakerModel: modelMode === 'simple' ? chosenModel : (tiebreakerModel || null),
       modelAssignments: modelMode === 'advanced' ? modelAssignments : null,
       maxRounds: rounds,
       searchProvider,
@@ -342,7 +364,7 @@ export default function AdvisorSetup({
         {modelMode === 'simple' ? (
           <div className="advisor-setup__model-simple">
             <label className="advisor-setup__model-label">
-              All advisors use the same model
+              All advisors and the verdict/tiebreaker use the same model
             </label>
             <SearchableModelSelect
               models={models}
@@ -381,6 +403,20 @@ export default function AdvisorSetup({
                 );
               })
             )}
+            <div className="advisor-setup__model-row advisor-setup__model-row--verdict">
+              <span className="advisor-setup__model-row-persona">
+                <span>⚖️</span>
+                <span>Verdict / Tiebreaker</span>
+              </span>
+              <SearchableModelSelect
+                models={models}
+                value={tiebreakerModel || ''}
+                onChange={handleTiebreakerModelChange}
+                placeholder={modelsLoading ? 'Loading…' : 'Search models…'}
+                isLoading={modelsLoading}
+                isDisabled={modelsLoading}
+              />
+            </div>
           </div>
         )}
       </div>

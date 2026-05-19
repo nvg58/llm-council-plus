@@ -6,6 +6,7 @@ import re
 from typing import List, Dict, Any, Optional
 
 from .council import query_model
+from .model_preflight import build_preflight_error_message, preflight_models
 from .personas import get_personas_by_ids, Persona
 from .settings import get_settings
 from .advisor_prompts import (
@@ -183,10 +184,12 @@ async def run_debate(
     persona_ids: List[str],
     model_assignments: Optional[Dict[str, str]] = None,
     default_model: Optional[str] = None,
+    tiebreaker_model: Optional[str] = None,
     max_rounds: int = 3,
     web_search: bool = False,
     search_context: str = "",
     request: Any = None,
+    preflight: bool = False,
 ):
     """
     Run a multi-round advisor debate.
@@ -222,6 +225,21 @@ async def run_debate(
 
     personas_map = {p.id: p for p in personas_list}
     personas_serialized = [p.model_dump() for p in personas_list]
+    verdict_model = tiebreaker_model or settings.advisor_tiebreaker_model or default_model
+
+    if preflight:
+        models_to_check = [
+            _resolve_model(pid, model_assignments, default_model)
+            for pid in persona_ids
+        ]
+        models_to_check.append(verdict_model)
+        preflight_result = await preflight_models(models_to_check)
+        if not preflight_result.ok:
+            yield {
+                "type": "advisor_error",
+                "message": build_preflight_error_message(preflight_result),
+            }
+            return
 
     search_context_block = ""
     if search_context:
@@ -245,7 +263,7 @@ async def run_debate(
     round_extracts: List[Dict[str, Any]] = []
     consensus_reached = False
     consensus_round: Optional[int] = None
-    extract_model = settings.advisor_tiebreaker_model or default_model
+    extract_model = verdict_model
 
     for round_num in range(1, max_rounds + 1):
         if request and await request.is_disconnected():
@@ -441,7 +459,6 @@ async def run_debate(
 
     tiebreaker_result = None
     if not consensus_reached and len(persona_ids) == 2:
-        tiebreaker_model = settings.advisor_tiebreaker_model or default_model
         yield {"type": "advisor_tiebreaker_start"}
 
         tiebreaker_prompt = _settings_prompt(
@@ -450,7 +467,7 @@ async def run_debate(
             question=question,
             transcript=transcript_text,
         )
-        tiebreaker_result = await _query_neutral(tiebreaker_model, tiebreaker_prompt)
+        tiebreaker_result = await _query_neutral(verdict_model, tiebreaker_prompt)
 
         yield {"type": "advisor_tiebreaker", "data": tiebreaker_result}
 
@@ -474,7 +491,6 @@ async def run_debate(
     if tiebreaker_result and tiebreaker_result.get("content"):
         verdict_prompt += f"\n\nTiebreaker ruling:\n{tiebreaker_result['content']}"
 
-    verdict_model = settings.advisor_tiebreaker_model or default_model
     verdict_data = await _query_neutral(verdict_model, verdict_prompt)
 
     yield {"type": "advisor_verdict", "data": verdict_data}

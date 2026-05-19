@@ -604,6 +604,12 @@
   gap: 12px;
 }
 
+.advisor-setup__model-row--verdict {
+  border-top: 1px solid rgba(168, 85, 247, 0.22);
+  margin-top: 4px;
+  padding-top: 12px;
+}
+
 .advisor-setup__model-row-persona {
   display: flex;
   align-items: center;

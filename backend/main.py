@@ -15,6 +15,8 @@ import asyncio
 
 from . import storage
 from .council import generate_conversation_title, generate_search_query, stage1_collect_responses, stage2_collect_rankings, stage3_synthesize_final, calculate_aggregate_rankings, PROVIDERS
+from .config import get_chairman_model, get_council_models
+from .model_preflight import build_preflight_error_message, preflight_models
 from .search import perform_web_search, SearchProvider
 from .settings import get_settings, save_settings, update_settings, Settings, DEFAULT_COUNCIL_MODELS, DEFAULT_CHAIRMAN_MODEL, AVAILABLE_MODELS, PROMPT_DEFAULTS
 from .personas import get_all_personas, save_persona_override, delete_persona_override, get_persona
@@ -125,6 +127,7 @@ class StartDebateRequest(BaseModel):
     persona_ids: List[str]
     model_assignments: Optional[Dict[str, str]] = None
     default_model: Optional[str] = None
+    tiebreaker_model: Optional[str] = None
     max_rounds: int = 3
     web_search: bool = False
     search_provider: Optional[str] = None
@@ -209,6 +212,22 @@ def _build_chat_history(conversation: Dict[str, Any]) -> List[Dict[str, str]]:
     return history
 
 
+def _build_council_preflight_models(body: SendMessageRequest) -> List[str]:
+    """Return the models that must be available before a council run starts."""
+    models = list(body.council_models or get_council_models())
+    if body.execution_mode == "full":
+        models.append(body.chairman_model or get_chairman_model())
+    return models
+
+
+async def _run_model_preflight(models: List[str]) -> str:
+    """Return a user-facing error message if model preflight fails."""
+    result = await preflight_models(models)
+    if result.ok:
+        return ""
+    return build_preflight_error_message(result)
+
+
 from dataclasses import dataclass, field
 
 
@@ -230,9 +249,21 @@ async def _run_council_pipeline(
     chairman_override: Optional[str] = None,
     request: Optional[Request] = None,
     history: Optional[List[Dict[str, str]]] = None,
+    preflight: bool = True,
 ) -> PipelineResult:
     """Shared orchestration for stage1 → stage2 → stage3 (non-streaming)."""
     result = PipelineResult()
+
+    if preflight:
+        body = SendMessageRequest(
+            content=content,
+            execution_mode=execution_mode,
+            council_models=models_override,
+            chairman_model=chairman_override,
+        )
+        preflight_error = await _run_model_preflight(_build_council_preflight_models(body))
+        if preflight_error:
+            raise HTTPException(status_code=400, detail=preflight_error)
 
     async for item in stage1_collect_responses(content, search_context, request=request, models_override=models_override, history=history):
         if isinstance(item, int):
@@ -349,6 +380,12 @@ async def send_message_stream(conversation_id: str, body: SendMessageRequest, re
             aggregate_rankings = {}
             
             storage.add_user_message(conversation_id, body.content, conversation=conversation)
+
+            preflight_error = await _run_model_preflight(_build_council_preflight_models(body))
+            if preflight_error:
+                storage.add_error_message(conversation_id, preflight_error)
+                yield f"data: {json.dumps({'type': 'error', 'message': preflight_error})}\n\n"
+                return
 
             # Start title generation in parallel (don't await yet)
             title_task = None
@@ -581,6 +618,7 @@ async def start_debate_stream(conversation_id: str, body: StartDebateRequest, re
             all_rounds = []
             verdict_data = None
             tiebreaker_data = None
+            saved_personas = []
 
             web_search_used = bool(body.search_provider or body.web_search)
             async for event in run_debate(
@@ -588,10 +626,12 @@ async def start_debate_stream(conversation_id: str, body: StartDebateRequest, re
                 persona_ids=body.persona_ids,
                 model_assignments=body.model_assignments,
                 default_model=body.default_model,
+                tiebreaker_model=body.tiebreaker_model,
                 max_rounds=body.max_rounds,
                 web_search=web_search_used,
                 search_context=search_context,
                 request=request,
+                preflight=True,
             ):
                 event_type = event.get("type", "")
 
@@ -601,11 +641,18 @@ async def start_debate_stream(conversation_id: str, body: StartDebateRequest, re
                     tiebreaker_data = event["data"].get("tiebreaker")
                     saved_personas = event["data"].get("personas", [])
 
+                if event_type == "advisor_error":
+                    message = event.get("message", "Advisor debate failed")
+                    storage.add_error_message(conversation_id, message)
+                    yield f"data: {json.dumps(event)}\n\n"
+                    return
+
                 yield f"data: {json.dumps(event)}\n\n"
 
             metadata = {
                 "persona_ids": body.persona_ids,
                 "default_model": body.default_model,
+                "tiebreaker_model": body.tiebreaker_model,
                 "model_assignments": body.model_assignments,
                 "max_rounds": body.max_rounds,
                 "web_search": web_search_used,
@@ -659,6 +706,11 @@ async def send_message_sync(conversation_id: str, body: SendMessageRequest):
         raise HTTPException(status_code=404, detail="Conversation not found")
 
     history = _build_chat_history(conversation)
+
+    preflight_error = await _run_model_preflight(_build_council_preflight_models(body))
+    if preflight_error:
+        raise HTTPException(status_code=400, detail=preflight_error)
+
     storage.add_user_message(conversation_id, body.content, conversation=conversation)
 
     search_context = ""
@@ -671,6 +723,7 @@ async def send_message_sync(conversation_id: str, body: SendMessageRequest):
         body.content, body.execution_mode, search_context,
         models_override=body.council_models, chairman_override=body.chairman_model,
         history=history,
+        preflight=False,
     )
 
     metadata = {"execution_mode": body.execution_mode}
@@ -709,13 +762,24 @@ async def ask_oneshot(body: AskRequest):
     if not models:
         raise HTTPException(status_code=400, detail="At least one model is required")
 
+    preflight_body = SendMessageRequest(
+        content=body.content,
+        execution_mode=body.execution_mode,
+        council_models=models,
+        chairman_model=body.chairman_model,
+    )
+    preflight_error = await _run_model_preflight(_build_council_preflight_models(preflight_body))
+    if preflight_error:
+        raise HTTPException(status_code=400, detail=preflight_error)
+
     search_context = ""
     if body.web_search:
         search_context, _, _ = await _fetch_search_context(body.content, settings)
 
     result = await _run_council_pipeline(
         body.content, body.execution_mode, search_context,
-        models_override=models, chairman_override=body.chairman_model
+        models_override=models, chairman_override=body.chairman_model,
+        preflight=False,
     )
 
     if body.execution_mode == "chat_only" and len(result.stage1) == 1:
