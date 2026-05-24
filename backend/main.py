@@ -313,9 +313,18 @@ class Conversation(BaseModel):
 
 
 @app.get("/api/health")
-async def health_check():
+async def health_check(request: Request):
     """Health check endpoint."""
-    return {"status": "ok", "service": "LLM Council API"}
+    host = request.headers.get("host", "localhost:8001")
+    scheme = request.headers.get("x-forwarded-proto", "http")
+    return {
+        "status": "ok",
+        "service": "LLM Council API",
+        "mcp": {
+            "sse_url": f"{scheme}://{host}/mcp/sse",
+            "tools": 25,
+        },
+    }
 
 
 @app.get("/")
@@ -1601,6 +1610,16 @@ async def test_openrouter_api(request: TestOpenRouterRequest):
         return {"success": False, "message": "Request timed out"}
     except Exception as e:
         return {"success": False, "message": str(e)}
+
+
+# ---------- MCP server (mounted on same port as REST API) ----------
+try:
+    from llm_council_mcp.server import create_server as _create_mcp_server
+    _mcp = _create_mcp_server(base_url="http://127.0.0.1:8001")
+    app.mount("/mcp", _mcp.sse_app())
+    logger.info("MCP server mounted at /mcp (SSE at /mcp/sse, messages at /mcp/messages)")
+except Exception:
+    logger.warning("MCP server not available — llm_council_mcp package may not be installed", exc_info=True)
 
 
 if os.path.isdir(FRONTEND_DIST_DIR):

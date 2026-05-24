@@ -4,9 +4,15 @@ LLM Council Plus exposes a Model Context Protocol (MCP) server that lets AI tool
 
 ## Quick Start
 
-- Install: `pip install -e .` from the project root
-- Register: `claude mcp add llm-council python -m llm_council_mcp`
-- Use: ask Claude "check the council health" or "run a deliberation on [your question]"
+### Option A: Local stdio (Standard for local development)
+1. Install from project root: `pip install -e .`
+2. Register: `claude mcp add llm-council python -m llm_council_mcp`
+
+### Option B: Remote SSE (Zero-install for containers / servers)
+1. Run backend container (exposing port `8001`).
+2. Register: `claude mcp add llm-council --url http://yourserver.com:8001/mcp/sse`
+
+---
 
 ## Choose Your Setup
 

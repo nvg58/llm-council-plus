@@ -312,11 +312,18 @@ The server exposes **25 tools** grouped into five categories:
 4. **Conversation Management**: List past sessions and retrieve full transcript logs.
 5. **System Health**: Check backend connectivity and test specific LLM provider connections on the fly.
 
-**Quick install for Claude Code:**
-```bash
-pip install -e .
-claude mcp add llm-council python -m llm_council_mcp
-```
+**Quick registration for Claude Code:**
+
+* **Option A: Local stdio (Standard for local development)**
+  ```bash
+  pip install -e .
+  claude mcp add llm-council python -m llm_council_mcp
+  ```
+
+* **Option B: Remote SSE (Zero-install for containers/servers)**
+  ```bash
+  claude mcp add llm-council --url http://yourserver.com:8001/mcp/sse
+  ```
 
 Then ask Claude: "check the council health" to verify the connection.
 

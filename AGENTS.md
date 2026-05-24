@@ -31,6 +31,7 @@ npm run dev
 **Ports:**
 - Backend: `http://localhost:8001` (NOT 8000 - avoid conflicts)
 - Frontend: `http://localhost:5173`
+- MCP Server (SSE): Built-in and mounted at `/mcp` on the backend (`http://localhost:8001/mcp/sse`)
 
 **Network Access:**
 ```bash

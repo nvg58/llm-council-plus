@@ -3,9 +3,6 @@ services:
     build: .
     ports:
       - "${PORT:-8001}:8001"
-      # MCP SSE transport port — uncomment to expose the MCP server for zero-install remote access.
-      # Then start the MCP server inside the container (see docs/mcp/SETUP-REMOTE.md).
-      # - "${MCP_PORT:-8002}:8002"
     environment:
       # Leave empty when serving frontend and API from this container.
       # Set to a full URL when the frontend is served elsewhere, for example:

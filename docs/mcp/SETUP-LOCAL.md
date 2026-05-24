@@ -2,7 +2,7 @@
 
 This guide covers installing the MCP server as a local process (stdio transport). It works whether your Council backend is on your laptop or on a remote server.
 
-If you want zero local installation, see [SETUP-REMOTE.md](SETUP-REMOTE.md) instead. If you are unsure which to choose, see [CHOOSING-TRANSPORT.md](CHOOSING-TRANSPORT.md).
+If you want zero local installation, you can connect directly to the remote server's built-in SSE endpoint on port 8001 at `/mcp/sse` (see [SETUP-REMOTE.md](SETUP-REMOTE.md) instead). If you are unsure which to choose, see [CHOOSING-TRANSPORT.md](CHOOSING-TRANSPORT.md).
 
 ---
 

@@ -19,7 +19,7 @@ Examples:
   # Remote backend, stdio transport
   python -m llm_council_mcp --base-url https://yourserver.com:8001
 
-  # SSE transport (zero local install — run on the server)
+  # Standalone SSE transport fallback (Note: SSE is built into the main uvicorn app at /mcp/sse on port 8001!)
   python -m llm_council_mcp --transport sse --port 8002
         """,
     )

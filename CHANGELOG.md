@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Single-Port MCP SSE Integration**: FastMCP server is now mounted directly onto the main FastAPI web server at `/mcp` on port `8001`. This allows zero-install remote connection via a single port (SSE session endpoint at `/mcp/sse` and JSON-RPC message endpoint at `/mcp/messages`).
+- **MCP Auto-Discovery**: The `/api/health` endpoint now includes an `mcp` metadata block advertising the active SSE URL and tool count to help agents auto-register the server.
+
+### Changed
+- **Removed Port 8002**: Removed all references, environment variables, mappings, and background process commands for port `8002` since both the REST API and MCP server run on port `8001`.
+- **Streamlined Documentation**: Rewrote all 5 MCP docs, `README.md`, and `AGENTS.md` to reflect the single-port architecture.
+
 ## [0.5.0] - 2026-05-24
 
 ### Added

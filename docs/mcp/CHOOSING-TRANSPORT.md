@@ -14,23 +14,23 @@ In stdio mode, your AI tool (Claude Code, Gemini CLI) launches the MCP server as
 
 ## What is SSE transport?
 
-In SSE (Server-Sent Events) mode, the MCP server runs as an HTTP server — typically inside the same container as the Council backend — and listens on port 8002. Your AI tool connects to it over HTTPS, with no local process involved.
+In SSE (Server-Sent Events) mode, the MCP server is mounted directly inside the main Council backend application on port `8001` at `/mcp`. Your AI tool connects to it over HTTP/HTTPS, with no local process involved.
 
 - Zero local installation: no Python, no pip, just a URL.
-- Requires port 8002 to be publicly reachable (firewall, reverse proxy, or VPN).
-- The MCP server and Council backend both run on the remote host.
+- Requires only the main backend port (`8001`) to be reachable (firewall, reverse proxy, or VPN).
+- The MCP server and Council backend run as a single process in the container.
 
 ---
 
 ## Side-by-side comparison
 
-| | stdio (local) | stdio (remote backend) | SSE (remote) |
+| Feature | stdio (local) | stdio (remote backend) | SSE (remote) |
 |---|---|---|---|
 | Local Python needed | Yes | Yes | No |
 | Backend location | localhost:8001 | Remote server | Remote server |
-| MCP server location | Your machine | Your machine | Remote server |
-| Ports to open | None | Backend 8001 | Backend 8001 + MCP 8002 |
-| Security | Process isolation | Outbound HTTPS only | Needs firewall/VPN for 8002 |
+| MCP server location | Your machine | Your machine | Remote server (built-in) |
+| Ports to open | None | Backend 8001 | Backend 8001 only |
+| Security | Process isolation | Outbound HTTPS only | Needs firewall/VPN/Auth for 8001 |
 | Best for | Local development | Remote server, laptop client | Shared team server, zero install |
 
 ---
@@ -50,9 +50,9 @@ Claude Code --stdio--> MCP server --HTTPS--> yourserver.com:8001
 ```
 
 **If Council runs on a remote server and you do not want to install anything locally:**
-Use SSE. Run the MCP server on the same host as the backend, expose port 8002, and register the URL in your AI tool.
+Use SSE. Mount the MCP server directly inside the backend app, exposing it on port 8001 under the `/mcp/sse` path.
 ```
-Claude Code --HTTPS--> Remote MCP server (8002) --HTTP--> backend (8001)
+Claude Code --HTTPS--> Remote Server (8001/mcp/sse) --internal--> FastAPI / FastMCP
 ```
 
 ---
@@ -64,13 +64,13 @@ stdio local:               stdio remote:                 SSE remote:
 
 Claude Code                Claude Code                   Claude Code
     |                          |                              |
-    | stdin/stdout             | stdin/stdout                 | HTTPS :8002
+    | stdin/stdout             | stdin/stdout                 | HTTPS :8001/mcp/sse
     v                          v                              v
-MCP server (local)         MCP server (local)         Remote MCP server
-    |                          |                              |
-    | HTTP                     | HTTPS                        | HTTP (internal)
-    v                          v                              v
-localhost:8001            yourserver.com:8001           backend (8001)
+MCP server (local)         MCP server (local)         Remote FastAPI App
+    |                          |                       - /mcp routes
+    | HTTP                     | HTTPS                 - REST / UI routes
+    v                          v                              
+localhost:8001            yourserver.com:8001           
 ```
 
 ---
@@ -78,13 +78,13 @@ localhost:8001            yourserver.com:8001           backend (8001)
 ## Frequently asked questions
 
 **Can I use SSE locally?**
-Yes. You can run the MCP server in SSE mode on localhost and point Claude Code to `http://localhost:8002/mcp`. This is unusual — stdio is simpler locally — but it works if you want to test the SSE path.
+Yes. Since SSE is built into the backend, any time you run `uv run python -m backend.main`, the SSE endpoint is live at `http://localhost:8001/mcp/sse`. You can register this URL in Claude Code. It works perfectly, though stdio is the default local setup.
 
 **Does SSE have built-in authentication?**
-No. The MCP server does not implement token-based auth on the SSE endpoint. If port 8002 is exposed to the internet, protect it with a firewall rule, a VPN, or a reverse proxy that enforces auth (nginx with `auth_basic`, Caddy with `basicauth`, Cloudflare Access, etc.).
+No. The MCP server does not implement token-based auth on the `/mcp` endpoints. If port `8001` is exposed to the internet, protect the entire app with a firewall rule, a VPN, or a reverse proxy that enforces auth (nginx with `auth_basic`, Caddy with `basicauth`, Cloudflare Access, etc.).
 
 **Which transport has better performance?**
-For individual users the difference is imperceptible — both add only a few milliseconds of overhead on top of LLM inference time. stdio avoids one network hop for local setups. SSE adds a network round-trip but saves you from maintaining a local Python environment.
+For individual users the difference is imperceptible — both add only a few milliseconds of overhead on top of LLM inference time. stdio avoids one network hop for local setups. SSE saves you from maintaining a local Python environment.
 
 **Do both transports support streaming responses?**
 Yes. Both transports stream deliberation output back to the AI tool as it arrives from the backend.
