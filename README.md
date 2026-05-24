@@ -7,6 +7,10 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](https://fastapi.tiangolo.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+<p align="center">
+  <img src="assets/landing_page.png" alt="LLM Council Plus Dual-Mode Entry Screen" width="75%">
+</p>
+
 ---
 
 ## What is LLM Council Plus?
@@ -299,7 +303,14 @@ Connect to any OpenAI-compatible API:
 
 ## MCP Server
 
-LLM Council Plus can be used as an MCP (Model Context Protocol) server, letting AI tools like Claude Code and Gemini CLI send questions to the council and retrieve deliberation results — without opening a browser.
+LLM Council Plus exposes a powerful Model Context Protocol (MCP) server that lets AI tools like Claude Code and Gemini CLI interact directly with your local or remote instance.
+
+The server exposes **25 tools** grouped into five categories:
+1. **Council Management**: Configure members, chairman, temperatures, search providers, and set API keys.
+2. **Deliberation**: Run parallel 3-stage deliberations, quick stateless chats, or multi-turn stateful conversations.
+3. **Advisor & Persona Management**: Run multi-round debates with custom verdicts, customize system prompts, emojis, and roles for all 10 advisor personas.
+4. **Conversation Management**: List past sessions and retrieve full transcript logs.
+5. **System Health**: Check backend connectivity and test specific LLM provider connections on the fly.
 
 **Quick install for Claude Code:**
 ```bash
@@ -309,7 +320,7 @@ claude mcp add llm-council python -m llm_council_mcp
 
 Then ask Claude: "check the council health" to verify the connection.
 
-See [docs/mcp/](docs/mcp/) for full setup guides, including remote server and SSE transport configurations.
+See **[docs/mcp/](docs/mcp/)** for full setup guides, including stdio/SSE transport configurations, complete tools reference, and usage examples.
 
 ---
 

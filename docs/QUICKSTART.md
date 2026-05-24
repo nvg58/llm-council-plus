@@ -59,11 +59,11 @@ The Settings panel opens automatically on first launch.
 
 ---
 
-## 4. Your First Query
+## 4. Your First Council Query
 
-1. Click **+** in the sidebar to start a new conversation
+1. Click **+ New Council** in the sidebar
 2. Type your question
-3. (Optional) Toggle **Web Search** for real-time info
+3. (Optional) Toggle **Web Search** for real-time grounding
 4. Press **Enter**
 
 Watch as:
@@ -73,25 +73,40 @@ Watch as:
 
 ---
 
-## 5. Execution Modes
+## 4b. Your First Advisor Debate
 
-Choose your deliberation depth (toggle in chat header):
+1. Click **+ New Advisors** in the sidebar
+2. Type a question or a decision to debate (e.g., "Should we rewrite our backend in Go?")
+3. Configure the debate options:
+   - Select 2 to 4 advisor personas (Skeptic, Strategist, Ethicist, etc.)
+   - Set the number of back-and-forth rounds (3 to 10)
+   - Choose a default model or assign specific models to individual personas
+4. Click **Start Debate** and watch the advisors debate each other by name, culminating in a structured consensus verdict with a recommended action plan!
 
-| Mode | What Happens |
-|------|--------------|
-| **Chat Only** | Just Stage 1 - quick individual responses |
-| **Chat + Ranking** | Stages 1 & 2 - see peer rankings |
-| **Full Deliberation** | All 3 stages - complete synthesis (default) |
+---
+
+## 5. Deliberation Modes
+
+Choose your deliberation type and depth:
+
+| Mode / System | What Happens | Best For |
+|------|--------------|----------|
+| **Chat Only (Council)** | Just Stage 1 — quick individual responses | Quick model comparisons |
+| **Chat + Ranking (Council)** | Stages 1 & 2 — see peer rankings and scores | Peer review without synthesis |
+| **Full Deliberation (Council)** | All 3 stages — complete synthesis (default) | Broad, highly accurate synthesis |
+| **LLM Advisors (Advisory)** | Persona-driven debate across configurable rounds | Complex strategic/moral decisions |
 
 ---
 
 ## 6. Quick Tips
 
-- **Mix model families** for diverse perspectives (e.g., GPT + Claude + Gemini)
-- **Use Groq** for speed - ultra-fast inference
-- **Use Ollama** for unlimited local queries
-- **"I'm Feeling Lucky"** button randomizes your council
-- **Abort anytime** with the stop button in sidebar
+- **Mix model families** in the council for diverse perspectives (e.g., GPT + Claude + Gemini)
+- **Assign specific models to personas**: Give *The Skeptic* a highly detailed model (like Claude) and *The Pragmatist* a fast model (like Groq)
+- **Use Groq** for ultra-fast council inference
+- **Use Ollama** for unlimited, free local queries (great for local Chairman synthesis using a model like `granite4:1b`)
+- **"I'm Feeling Lucky"** randomizes your council composition
+- **Customize Personas**: Go to **Settings** → **Advisors** to edit name, description, emoji, and prompt for any advisor persona
+- **Abort anytime** with the stop button in the sidebar
 
 ---
 

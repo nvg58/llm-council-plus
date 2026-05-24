@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.5.0] - 2026-05-18
+## [0.5.0] - 2026-05-24
 
 ### Added
 - **LLM Advisors mode**: Entirely new persona-driven debate system where named advisor personas argue your question across configurable rounds, reaching consensus or voting to deliver a structured verdict with action plan
@@ -24,6 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Advisor conversation persistence**: `add_advisor_message()` in storage saves full debate transcripts (rounds, verdict, tiebreaker, persona IDs) alongside existing council conversations
 - **Advisor settings**: `advisor_default_model` and `advisor_default_rounds` fields in settings with validation (1–10 rounds, 2–4 advisors per debate)
 - **NVIDIA SVG icon** (`frontend/src/assets/icons/nvidia.svg`) with provider detection in `CouncilGrid.jsx`
+- **Complete MCP documentation rewrite** (`docs/mcp/TOOLS.md`): Exposes all **25 tools** across 5 categories, with full parameter listings and JSON output examples (including 11 new tools previously missing from docs)
+- **Advisor MCP examples** (`docs/mcp/EXAMPLES.md`): Added 3 comprehensive walkthrough examples covering running advisor debates, customizing/resetting personas via tools, and configuring global advisor preferences
+- **Quickstart Advisor Integration** (`docs/QUICKSTART.md`): Added complete walkthroughs for configuring and running the first Advisor debate, custom personas tips, and mode comparison matrix
 
 ### Changed
 - **App architecture**: `App.jsx` refactored to support dual-mode routing — landing page → council mode or advisors mode, with independent state management for each
@@ -33,6 +36,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Settings UI**: NVIDIA API key section added to Provider Settings with test/save flow
 - **`ChatInterface`**: Extended to support both council and advisor question submission flows
 - **`llm-council-api` skill updated to v0.5.0**: Documents advisor endpoints, persona API, NVIDIA provider, and dual-mode architecture
+- **Main README expanded**: Updated MCP Server details to cover dual-mode capability (Council + Advisors) and all 25 tools
+- **Skill Reference expanded** (`skills/llm-council-api/SKILL.md`): Added extensive examples for custom OpenAI endpoint configuration (OpenCode Zen), hybrid local/cloud council setups, and per-persona model assignment walkthroughs
+
+### Removed
+- **Outdated binary assets**: Cleaned up stale PNG screenshots (`header.png`, `landing_page.png`, `debate_page.png`) from repository root
+- **Git status noise**: Added `.antigravitycli/` config directories to `.gitignore`
 
 ## [0.4.2] - 2026-05-15
 

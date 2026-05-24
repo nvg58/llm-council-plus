@@ -1,6 +1,6 @@
 # LLM Council Plus — MCP Server
 
-LLM Council Plus exposes a Model Context Protocol (MCP) server that lets AI tools like Claude Code and Gemini CLI send questions directly to your council and retrieve deliberation results — all without opening a browser. Ask your AI assistant to run a full 3-stage deliberation, configure council members, or fetch past conversations, and it talks to the backend on your behalf.
+LLM Council Plus exposes a Model Context Protocol (MCP) server that lets AI tools like Claude Code and Gemini CLI send questions directly to your council and retrieve deliberation results — all without opening a browser. Ask your AI assistant to run a full 3-stage deliberation, configure council members, initiate multi-round advisor debates, customize persona thinking styles, or fetch past conversations, and it talks to the backend on your behalf.
 
 ## Quick Start
 
@@ -19,7 +19,7 @@ LLM Council Plus exposes a Model Context Protocol (MCP) server that lets AI tool
 
 ## Tools Reference
 
-See [TOOLS.md](TOOLS.md) for all 13 tools with parameters and examples.
+See [TOOLS.md](TOOLS.md) for all **25 tools** with parameters and examples.
 
 ## Examples
 

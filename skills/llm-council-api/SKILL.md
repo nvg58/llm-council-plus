@@ -654,6 +654,131 @@ curl -X PUT http://localhost:8001/api/settings \
 
 ---
 
+### 19. Custom OpenAI-Compatible Endpoints (OpenCode Zen Setup)
+
+LLM Council Plus allows you to connect to any OpenAI-compatible API (such as Together, Fireworks, Together, vLLM, LM Studio, or OpenCode Zen) and use their models seamlessly.
+
+To register a custom provider (e.g. OpenCode Zen at `https://opencode.ai/zen/v1/` with a default model query API):
+
+```bash
+curl -X PUT http://localhost:8001/api/settings \
+  -H "Content-Type: application/json" \
+  -d '{
+    "custom_endpoint_name": "OpenCodeZen",
+    "custom_endpoint_url": "https://opencode.ai/zen/v1/",
+    "custom_endpoint_api_key": "your-api-key-here",
+    "enabled_providers": {
+      "openrouter": false,
+      "ollama": true,
+      "groq": false,
+      "direct": false,
+      "custom": true
+    }
+  }'
+```
+
+Once saved and enabled, you can reference the custom models by prepending the `custom:` prefix:
+- `custom:deepseek-v4-flash-free`
+- `custom:big-pickle`
+- `custom:nemotron-3-super-free`
+
+For example, to run a stateless query using `custom:deepseek-v4-flash-free`:
+```bash
+curl -X POST http://localhost:8001/api/ask \
+  -H "Content-Type: application/json" \
+  -d '{
+    "content": "Explain functional programming in one sentence.",
+    "models": ["custom:deepseek-v4-flash-free"],
+    "execution_mode": "chat_only"
+  }'
+```
+
+---
+
+### 20. Setup Walkthrough for Per-Persona Debate Models
+
+You can customize exactly which model runs which persona to match their specific personalities (e.g., giving *The Skeptic* a highly detailed model, and *The Pragmatist* a fast, concise model).
+
+Here is a python script demonstrating how to configure and launch a customized 3-persona debate where:
+- **The Skeptic** runs on a premium cloud model (`openrouter:anthropic/claude-3.5-sonnet`)
+- **The Pragmatist** runs on a fast inference model (`groq:llama3-70b-8192`)
+- **The Innovator** runs on a local model (`ollama:granite4:1b`)
+
+```python
+import asyncio, httpx, json
+
+async def run_hybrid_debate():
+    async with httpx.AsyncClient(timeout=300) as client:
+        # 1. Create a fresh conversation
+        conv = (await client.post("http://localhost:8001/api/conversations", json={})).json()
+        conv_id = conv["id"]
+
+        # 2. Setup the debate payload
+        payload = {
+            "question": "Should we move our frontend state from Redux to Jotai?",
+            "persona_ids": ["skeptic", "pragmatist", "innovator"],
+            "max_rounds": 3,
+            "default_model": "openrouter:google/gemini-pro-1.5",
+            "model_assignments": {
+                "skeptic": "openrouter:anthropic/claude-3.5-sonnet", # premium detail
+                "pragmatist": "groq:llama3-70b-8192",                # fast pragmatic responses
+                "innovator": "ollama:granite4:1b"                   # creative local experiments
+            }
+        }
+
+        # 3. Stream the debate
+        async with client.stream("POST", f"http://localhost:8001/api/conversations/{conv_id}/debate/stream", json=payload) as resp:
+            async for line in resp.aiter_lines():
+                if not line.startswith("data: "):
+                    continue
+                event = json.loads(line[6:])
+                
+                # Print real-time updates as advisors speak
+                if event.get("type") == "advisor_response":
+                    data = event["data"]
+                    print(f"\n[{data['persona_name']}] speaking via ({data['model']}):")
+                    print(data["content"])
+                
+                elif event.get("type") == "advisor_complete":
+                    print("\n=== DEBATE VERDICT ===")
+                    print(event["data"]["verdict"]["content"])
+
+asyncio.run(run_hybrid_debate())
+```
+
+---
+
+### 21. Hybrid Local/Cloud Council Configuration
+
+For maximum budget efficiency, you can run a hybrid council where multiple fast/cheap models answer independently in Stage 1, and a powerful local or cloud model synthesizes the answer as the Chairman in Stage 3.
+
+Example: **OpenCode Zen / Groq for Stage 1 & 2**, and **Ollama granite4:1b locally for Chairman Stage 3**:
+
+```bash
+# 1. Save settings
+curl -X PUT http://localhost:8001/api/settings \
+  -H "Content-Type: application/json" \
+  -d '{
+    "council_models": [
+      "custom:deepseek-v4-flash-free",
+      "custom:nemotron-3-super-free",
+      "groq:llama3-70b-8192"
+    ],
+    "chairman_model": "ollama:granite4:1b",
+    "execution_mode": "full"
+  }'
+
+# 2. Deliberate
+curl -X POST http://localhost:8001/api/ask \
+  -H "Content-Type: application/json" \
+  -d '{
+    "content": "What is the best way to cache user sessions in a distributed web app?",
+    "execution_mode": "full"
+  }'
+```
+
+---
+
 ## Backup and Restore
 
 ```bash

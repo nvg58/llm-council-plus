@@ -224,3 +224,148 @@ The model receives the full prior conversation as context and responds with a re
 - The model sees all prior user/assistant turns automatically
 - No need to repeat context or re-explain — the model remembers
 - For one-off questions without memory, use `quick_chat` instead
+
+---
+
+## Example 5: Run an advisor debate
+
+**What you say to your AI:**
+
+> "Ask the advisors to debate whether we should migrate our backend from monolithic REST to distributed gRPC. Get The Skeptic and The Strategist to participate."
+
+**What happens behind the scenes:**
+
+The AI identifies that you want a multi-round debate among specific personas, mapping "The Skeptic" to `skeptic` and "The Strategist" to `strategist`. It calls `run_advisor_debate`:
+
+```json
+{
+  "tool": "run_advisor_debate",
+  "input": {
+    "question": "Should we migrate our backend from monolithic REST to distributed gRPC?",
+    "persona_ids": ["skeptic", "strategist"],
+    "max_rounds": 3
+  }
+}
+```
+
+The MCP server coordinates with the backend to run the structured debate and returns the full transcript and verdict:
+
+```json
+{
+  "conversation_id": "deb-555",
+  "status": "completed",
+  "rounds": [
+    {
+      "round": 1,
+      "messages": [
+        {
+          "persona": "skeptic",
+          "content": "gRPC adds massive complexity. You have to compile proto files, debug HTTP/2 issues, lose simple browser tooling (like curl), and handle complex load balancing. Our team isn't ready for distributed system failures."
+        },
+        {
+          "persona": "strategist",
+          "content": "While those operational hurdles are real, the long-term leverage is immense. Strongly-typed contracts prevent frontend-backend sync bugs, binary serialization dramatically cuts network costs, and streaming supports real-time features easily."
+        }
+      ]
+    }
+  ],
+  "verdict": {
+    "summary": "The Skeptic highlighted operational friction while the Strategist focused on contract safety and scale.",
+    "verdict": "DO NOT MIGRATE YET. Keep the monolithic REST API but adopt strict schema validation (like Pydantic/Zod) to address contract safety without gRPC operational complexity.",
+    "action_plan": [
+      "1. Implement OpenAPI/Pydantic schemas on existing REST endpoints.",
+      "2. Conduct a small gRPC prototype for service-to-service communication only if REST latency becomes a bottleneck."
+    ]
+  }
+}
+```
+
+**What your AI presents to you:**
+
+The AI synthesizes a clear narrative of the debate, highlighting the opening stances, the consensus reached (or split), and the final actionable verdict.
+
+---
+
+## Example 6: Customize and reset a persona
+
+**What you say to your AI:**
+
+> "Customize the Skeptic persona to make him extremely security-focused, then let me see his details."
+
+**What happens behind the scenes:**
+
+The AI updates the system prompt and description of the `skeptic` persona:
+
+```json
+{
+  "tool": "update_persona",
+  "input": {
+    "persona_id": "skeptic",
+    "role": "Security Auditor & Skeptic",
+    "description": "Examines proposals exclusively through the lens of OWASP Top 10, data leaks, and access controls.",
+    "system_prompt": "You are The Security Skeptic. Your single goal is to find security vulnerabilities, threat models, and architectural risks in every proposal."
+  }
+}
+```
+
+Response:
+```json
+{
+  "id": "skeptic",
+  "name": "The Skeptic",
+  "role": "Security Auditor & Skeptic",
+  "description": "Examines proposals exclusively...",
+  "avatar_emoji": "🔍",
+  "is_customized": true
+}
+```
+
+The AI then confirms:
+> "I've customized The Skeptic to be a Security Auditor & Skeptic. His system prompt has been updated to focus entirely on vulnerabilities, threat models, and OWASP. He will now critique all future debates from this perspective."
+
+**To reset him later, you can say:**
+> "Reset the Skeptic persona back to normal."
+
+Behind the scenes:
+```json
+{
+  "tool": "reset_persona",
+  "input": {
+    "persona_id": "skeptic"
+  }
+}
+```
+
+---
+
+## Example 7: Configure advisors globally
+
+**What you say to your AI:**
+
+> "Configure the advisors to use deepseek-v4-flash-free as the default model, running 4 rounds."
+
+**What happens behind the scenes:**
+
+The AI calls `configure_advisors`:
+
+```json
+{
+  "tool": "configure_advisors",
+  "input": {
+    "default_model": "custom:deepseek-v4-flash-free",
+    "default_rounds": 4
+  }
+}
+```
+
+Response:
+```
+Advisor config updated:
+  advisor_default_model: custom:deepseek-v4-flash-free
+  advisor_default_rounds: 4
+```
+
+**What your AI presents to you:**
+
+> "All advisor debates will now default to running 4 rounds of back-and-forth statements using the custom `deepseek-v4-flash-free` model. Ready to start a debate session?"
+
