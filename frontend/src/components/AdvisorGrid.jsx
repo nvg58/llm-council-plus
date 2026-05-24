@@ -1,4 +1,5 @@
 import React from 'react';
+import { getShortModelName } from '../utils/modelHelpers';
 import './AdvisorGrid.css';
 
 export default function AdvisorGrid({
@@ -52,6 +53,9 @@ export default function AdvisorGrid({
               <div className="advisor-info">
                 <span className="advisor-name">{persona.name}</span>
                 <span className="advisor-role">{persona.role}</span>
+                {persona.model && (
+                  <span className="advisor-model">{getShortModelName(persona.model)}</span>
+                )}
               </div>
             </div>
           );
@@ -60,3 +64,4 @@ export default function AdvisorGrid({
     </div>
   );
 }
+

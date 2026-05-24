@@ -144,9 +144,7 @@ def register(server: Any, base_url: str) -> None:
 
         try:
             async with CouncilClient(base_url) as client:
-                current = await client.get_settings()
-                current.update(updates)
-                await client.update_settings(**current)
+                await client.update_settings(**updates)
             lines = [f"  {k}: {v}" for k, v in updates.items()]
             return "Advisor config updated:\n" + "\n".join(lines)
         except Exception as exc:

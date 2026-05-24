@@ -249,6 +249,13 @@
   letter-spacing: 0.05em;
 }
 
+.debate-view__response-model {
+  font-family: var(--font-code);
+  font-size: 9.5px;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+
 .debate-view__response-error-badge {
   font-family: var(--font-ui);
   font-size: 11px;

@@ -1,4 +1,4 @@
-import { Suspense, lazy, useState, useEffect, useRef } from 'react';
+import { Suspense, lazy, useState, useEffect, useRef, Component } from 'react';
 import Sidebar from './components/Sidebar';
 import { api, DEFAULT_EXECUTION_MODE, buildAvailableSearchProviders } from './api';
 import './App.css';
@@ -15,6 +15,28 @@ function AppLoadingFallback() {
       Loading...
     </div>
   );
+}
+
+class AppErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="app-loading" role="alert">
+          Failed to load. Please refresh the page.
+        </div>
+      );
+    }
+    return this.props.children;
+  }
 }
 
 function App() {
@@ -899,6 +921,7 @@ function App() {
           }
           return { ...prev, messages };
         });
+        setIsLoading(false);
         return;
       }
       console.error('Failed to send message:', error);
@@ -980,39 +1003,43 @@ function App() {
       />
 
       <div className="main-area">
-        <Suspense fallback={<AppLoadingFallback />}>
-          {appMode === null && !currentConversationId ? (
-            <LandingPage onSelectMode={(m) => setAppMode(m)} />
-          ) : (
-            <ChatInterface
-              conversation={currentConversation}
-              onSendMessage={handleSendMessage}
-              onAbort={handleAbort}
-              isLoading={isLoading}
-              councilConfigured={councilConfigured}
-              councilModels={councilModels}
-              chairmanModel={chairmanModel}
-              searchProvider={searchProvider}
-              availableSearchProviders={availableSearchProviders}
-              onOpenSettings={handleOpenSettings}
-              executionMode={executionMode}
-              onExecutionModeChange={setExecutionMode}
-              mode={appMode}
-              onStartDebate={handleStartDebate}
-            />
-          )}
-        </Suspense>
+        <AppErrorBoundary>
+          <Suspense fallback={<AppLoadingFallback />}>
+            {appMode === null && !currentConversationId ? (
+              <LandingPage onSelectMode={(m) => setAppMode(m)} />
+            ) : (
+              <ChatInterface
+                conversation={currentConversation}
+                onSendMessage={handleSendMessage}
+                onAbort={handleAbort}
+                isLoading={isLoading}
+                councilConfigured={councilConfigured}
+                councilModels={councilModels}
+                chairmanModel={chairmanModel}
+                searchProvider={searchProvider}
+                availableSearchProviders={availableSearchProviders}
+                onOpenSettings={handleOpenSettings}
+                executionMode={executionMode}
+                onExecutionModeChange={setExecutionMode}
+                mode={appMode}
+                onStartDebate={handleStartDebate}
+              />
+            )}
+          </Suspense>
+        </AppErrorBoundary>
       </div>
 
       {showSettings && (
-        <Suspense fallback={<AppLoadingFallback />}>
-          <Settings
-            onClose={handleSettingsClose}
-            ollamaStatus={ollamaStatus}
-            onRefreshOllama={testOllamaConnection}
-            initialSection={settingsInitialSection}
-          />
-        </Suspense>
+        <AppErrorBoundary>
+          <Suspense fallback={<AppLoadingFallback />}>
+            <Settings
+              onClose={handleSettingsClose}
+              ollamaStatus={ollamaStatus}
+              onRefreshOllama={testOllamaConnection}
+              initialSection={settingsInitialSection}
+            />
+          </Suspense>
+        </AppErrorBoundary>
       )}
     </div>
   );

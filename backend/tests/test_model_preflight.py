@@ -48,8 +48,22 @@ async def test_preflight_deduplicates_models_before_querying():
     with patch("backend.model_preflight.query_model", new_callable=AsyncMock) as mock_query:
         mock_query.return_value = {"error": False, "content": "OK"}
 
-        result = await preflight_models(["openai:gpt-4.1", "openai:gpt-4.1", ""], timeout=5.0)
+        result = await preflight_models(["openai:GPT-4.1", "openai:gpt-4.1", ""], timeout=5.0)
 
     assert result.ok is True
     assert mock_query.await_count == 1
+    assert mock_query.call_args[0][0] == "openai:GPT-4.1"
+
+
+@pytest.mark.asyncio
+async def test_preflight_semaphore_does_not_change_behavior():
+    with patch("backend.model_preflight.query_model", new_callable=AsyncMock) as mock_query:
+        mock_query.return_value = {"error": False, "content": "OK"}
+
+        models = [f"openai:gpt-{i}" for i in range(10)]
+        result = await preflight_models(models, timeout=5.0)
+
+    assert result.ok is True
+    assert mock_query.call_count == 10
+
 

@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import AdvisorGrid from './AdvisorGrid';
 import MarkdownContent from './MarkdownContent';
+import { getShortModelName } from '../utils/modelHelpers';
 import './DebateView.css';
 
 const toStr = (v) => (typeof v === 'string' ? v : String(v || ''));
@@ -30,7 +31,7 @@ function RoundSection({ roundIndex, roundData, personas, isLast, isRunning }) {
 
           return (
             <div
-              key={idx}
+              key={resp.persona_id || idx}
               className="debate-view__response-card"
               style={{ '--persona-color': displayColor }}
             >
@@ -45,6 +46,11 @@ function RoundSection({ roundIndex, roundData, personas, isLast, isRunning }) {
                   <span className="debate-view__response-role">
                     {displayRole}
                   </span>
+                  {resp.model && (
+                    <span className="debate-view__response-model">
+                      {getShortModelName(resp.model)}
+                    </span>
+                  )}
                 </div>
                 {hasError && (
                   <span className="debate-view__response-error-badge">Error</span>

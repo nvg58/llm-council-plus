@@ -1,11 +1,14 @@
 """Settings storage and management."""
 
 import json
+import logging
 import os
 from pathlib import Path
 from typing import Optional, List, Dict
 from pydantic import BaseModel
 from .search import SearchProvider
+
+logger = logging.getLogger(__name__)
 
 # Settings file path
 SETTINGS_FILE = Path(__file__).parent.parent / "data" / "settings.json"
@@ -199,7 +202,7 @@ def get_settings() -> Settings:
                 _settings_mtime = mtime
                 return _settings_cache
         except Exception:
-            pass
+            logger.exception("Failed to load settings from %s", SETTINGS_FILE)
 
     if _settings_cache is not None and not SETTINGS_FILE.exists():
         _settings_cache = None

@@ -28,6 +28,35 @@ export function buildAvailableSearchProviders(settings) {
 
 export const DEFAULT_EXECUTION_MODE = 'full';
 
+async function _consumeSSEStream(body, onEvent) {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  try {
+    let buffer = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const parts = buffer.split('\n\n');
+      buffer = parts.pop();
+      for (const block of parts) {
+        for (const line of block.split('\n')) {
+          if (line.startsWith('data: ')) {
+            try {
+              const event = JSON.parse(line.slice(6));
+              onEvent(event.type, event);
+            } catch (e) {
+              console.error('Failed to parse SSE event:', e);
+            }
+          }
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 export const api = {
   /**
    * List all conversations.
@@ -380,32 +409,7 @@ export const api = {
       throw new Error('Failed to start debate stream');
     }
 
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n');
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6);
-            try {
-              const event = JSON.parse(data);
-              onEvent(event.type, event);
-            } catch (e) {
-              console.error('Failed to parse SSE event:', e);
-            }
-          }
-        }
-      }
-    } finally {
-      reader.releaseLock();
-    }
+    await _consumeSSEStream(response.body, onEvent);
   },
 
   /**
@@ -439,31 +443,6 @@ export const api = {
       throw new Error('Failed to send message');
     }
 
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n');
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6);
-            try {
-              const event = JSON.parse(data);
-              onEvent(event.type, event);
-            } catch (e) {
-              console.error('Failed to parse SSE event:', e);
-            }
-          }
-        }
-      }
-    } finally {
-      reader.releaseLock();
-    }
+    await _consumeSSEStream(response.body, onEvent);
   },
 };

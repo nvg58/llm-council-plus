@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from dataclasses import dataclass, field
 from typing import Iterable
 
 from .council import query_model
+
+logger = logging.getLogger(__name__)
 
 PREFLIGHT_PROMPT = "Reply with OK."
 DEFAULT_PREFLIGHT_TIMEOUT = 5.0
@@ -29,9 +32,12 @@ def _dedupe_models(models: Iterable[str]) -> list[str]:
     unique: list[str] = []
     for model in models:
         normalized = (model or "").strip()
-        if not normalized or normalized in seen:
+        if not normalized:
             continue
-        seen.add(normalized)
+        comp = normalized.lower()
+        if comp in seen:
+            continue
+        seen.add(comp)
         unique.append(normalized)
     return unique
 
@@ -53,7 +59,9 @@ async def _preflight_one(model: str, timeout: float) -> tuple[str, str | None, b
             return model, None, True
         return model, message, False
 
-    if not result or not result.get("error"):
+    if not result:
+        return model, "Model returned empty or null response", False
+    if not result.get("error"):
         return model, None, False
 
     message = result.get("error_message", "Unknown model error")
@@ -73,10 +81,21 @@ async def preflight_models(
     if not unique_models:
         return result
 
-    checks = [_preflight_one(model, timeout) for model in unique_models]
+    sem = asyncio.Semaphore(5)
+
+    async def _preflight_with_sem(m: str):
+        async with sem:
+            return await _preflight_one(m, timeout)
+
+    checks = [_preflight_with_sem(model) for model in unique_models]
     for model, error, timed_out in await asyncio.gather(*checks):
         if timed_out:
             result.timeouts.append(model)
+            logger.warning(
+                "Preflight timeout for model %s (%.1fs) — will retry under full timeout",
+                model,
+                timeout,
+            )
         elif error:
             result.failures.append({"model": model, "error": error})
 
@@ -98,4 +117,3 @@ def build_preflight_error_message(result: ModelPreflightResult) -> str:
         "One or more selected models are not currently available: "
         f"{details}"
     )
-

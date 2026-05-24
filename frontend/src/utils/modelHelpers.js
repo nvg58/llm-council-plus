@@ -57,11 +57,7 @@ export const getModelVisuals = (modelId) => {
 
 export const getShortModelName = (modelId) => {
   if (!modelId) return 'Unknown';
-  // Handle "provider/model-name" format
-  const parts = modelId.split('/');
-  if (parts.length > 1) return parts[1];
-  // Handle "provider:model-name" format
-  const colParts = modelId.split(':');
-  if (colParts.length > 1) return colParts[1];
+  if (modelId.includes('/')) return modelId.split('/').pop();
+  if (modelId.includes(':')) return modelId.split(':').pop();
   return modelId;
 };

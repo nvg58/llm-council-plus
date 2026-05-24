@@ -1,6 +1,8 @@
 """Built-in advisor persona registry with user override support."""
 
 import json
+import os
+import tempfile
 from pathlib import Path
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel
@@ -248,7 +250,14 @@ def _load_overrides() -> Dict[str, Dict[str, Any]]:
 def _save_overrides(overrides: Dict[str, Dict[str, Any]]) -> None:
     global _overrides_cache
     _DATA_DIR.mkdir(parents=True, exist_ok=True)
-    _OVERRIDES_FILE.write_text(json.dumps(overrides, indent=2, ensure_ascii=False), encoding="utf-8")
+    fd, tmp_path = tempfile.mkstemp(dir=_DATA_DIR, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(json.dumps(overrides, indent=2, ensure_ascii=False))
+        os.replace(tmp_path, _OVERRIDES_FILE)
+    except Exception:
+        os.unlink(tmp_path)
+        raise
     _overrides_cache = overrides
 
 

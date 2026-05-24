@@ -224,14 +224,15 @@ async def run_debate(
         return
 
     personas_map = {p.id: p for p in personas_list}
-    personas_serialized = [p.model_dump() for p in personas_list]
+    personas_serialized = []
+    for p in personas_list:
+        p_dict = p.model_dump()
+        p_dict["model"] = _resolve_model(p.id, model_assignments, default_model)
+        personas_serialized.append(p_dict)
     verdict_model = tiebreaker_model or settings.advisor_tiebreaker_model or default_model
 
     if preflight:
-        models_to_check = [
-            _resolve_model(pid, model_assignments, default_model)
-            for pid in persona_ids
-        ]
+        models_to_check = [p["model"] for p in personas_serialized]
         models_to_check.append(verdict_model)
         preflight_result = await preflight_models(models_to_check)
         if not preflight_result.ok:
@@ -258,6 +259,8 @@ async def run_debate(
             "web_search": web_search,
         },
     }
+
+    safe_question = question.replace("{", "{{").replace("}", "}}")
 
     all_rounds: List[Dict[str, Any]] = []
     round_extracts: List[Dict[str, Any]] = []
@@ -288,7 +291,7 @@ async def run_debate(
                 settings, "advisor_round1_prompt", ADVISOR_ROUND1_PROMPT
             ).format(
                 search_context_block=search_context_block,
-                question=question,
+                question=safe_question,
                 consensus_tag=CONSENSUS_TAG_INSTRUCTION,
             )
         else:
@@ -302,7 +305,7 @@ async def run_debate(
                 settings, "advisor_followup_prompt", ADVISOR_FOLLOWUP_PROMPT
             ).format(
                 search_context_block=search_context_block if round_num == 2 else "",
-                question=question,
+                question=safe_question,
                 transcript=transcript_text,
                 round_number=round_num,
                 previous_round_number=round_num - 1,
@@ -434,7 +437,7 @@ async def run_debate(
                 "advisor_cross_pollination_prompt",
                 ADVISOR_CROSS_POLLINATION_PROMPT,
             ).format(
-                question=question,
+                question=safe_question,
                 round_number=round_num,
                 round_transcript=round_transcript,
             )
@@ -464,7 +467,7 @@ async def run_debate(
         tiebreaker_prompt = _settings_prompt(
             settings, "advisor_tiebreaker_prompt", ADVISOR_TIEBREAKER_PROMPT
         ).format(
-            question=question,
+            question=safe_question,
             transcript=transcript_text,
         )
         tiebreaker_result = await _query_neutral(verdict_model, tiebreaker_prompt)
@@ -483,7 +486,7 @@ async def run_debate(
     verdict_prompt = _settings_prompt(
         settings, "advisor_verdict_prompt", ADVISOR_VERDICT_PROMPT
     ).format(
-        question=question,
+        question=safe_question,
         transcript=transcript_text,
         debate_arc=debate_arc,
     )
