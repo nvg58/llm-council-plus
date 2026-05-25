@@ -1023,6 +1023,7 @@ function App() {
                 onExecutionModeChange={setExecutionMode}
                 mode={appMode}
                 onStartDebate={handleStartDebate}
+                onNewConversation={handleNewConversation}
               />
             )}
           </Suspense>

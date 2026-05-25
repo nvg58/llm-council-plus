@@ -7,7 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-05-24
+
 ### Added
+- **Start a New Council Session Button**: Prominent glowing turquoise CTA button placed cleanly below the Council grid row on the home dashboard (only in Council mode), allowing users to easily launch new deliberation sessions.
 - **Single-Port MCP SSE Integration**: FastMCP server is now mounted directly onto the main FastAPI web server at `/mcp` on port `8001`. This allows zero-install remote connection via a single port (SSE session endpoint at `/mcp/sse` and JSON-RPC message endpoint at `/mcp/messages`).
 - **MCP Auto-Discovery**: The `/api/health` endpoint now includes an `mcp` metadata block advertising the active SSE URL and tool count to help agents auto-register the server.
 

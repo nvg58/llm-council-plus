@@ -26,6 +26,7 @@ export default function ChatInterface({
     availableSearchProviders = [{ id: 'duckduckgo', name: 'DuckDuckGo' }],
     mode = 'council',
     onStartDebate,
+    onNewConversation,
 }) {
     const [input, setInput] = useState('');
     const [activeSearchProvider, setActiveSearchProvider] = useState(null);
@@ -102,6 +103,13 @@ export default function ChatInterface({
                     <div className="welcome-grid-container">
                         <CouncilGrid models={councilModels} chairman={chairmanModel} status="idle" chairmanDisabled={executionMode !== 'full'} />
                     </div>
+                    <button className="start-session-btn" onClick={onNewConversation}>
+                        <span className="btn-glow" />
+                        <span className="btn-content">
+                            <span className="btn-icon">✨</span>
+                            Start a New Council Session
+                        </span>
+                    </button>
                 </div>
             </div>
         );

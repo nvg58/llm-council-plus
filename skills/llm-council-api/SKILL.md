@@ -1,6 +1,6 @@
 ---
 name: llm-council-api
-version: 0.5.0
+version: 0.5.1
 description: Use when interacting with LLM Council Plus via HTTP API — configuring the council or advisors, running deliberations or persona debates, managing personas, or inspecting conversations — especially when the MCP server is unavailable, the SSE session is stale, or direct REST access is preferred. Triggers on requests like "ask the council", "run an advisor debate", "configure models", "list personas", "edit a persona", "run a deliberation", "check council health", or any manipulation of the LLM Council Plus system.
 ---
 
