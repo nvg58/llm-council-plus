@@ -53,13 +53,12 @@ cd frontend && npm run dev -- --host
 uv sync
 
 # Frontend
-cd frontend
-npm install
+npm install --prefix frontend
 ```
 
 **Important**: If switching between Intel/Apple Silicon Macs with iCloud sync:
 ```bash
-rm -rf frontend/node_modules && cd frontend && npm install
+rm -rf frontend/node_modules && npm install --prefix frontend
 ```
 This fixes binary incompatibilities (e.g., `@rollup/rollup-darwin-*` variants).
 

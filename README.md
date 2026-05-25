@@ -41,8 +41,8 @@ LLM Council Plus is a **dual-mode multi-model AI deliberation system**. Instead 
 # Clone and install
 git clone https://github.com/jacob-bd/llm-council-plus.git
 cd llm-council-plus
-uv sync                    # Backend dependencies
-cd frontend && npm install # Frontend dependencies
+uv sync                        # Backend dependencies
+npm install --prefix frontend  # Frontend dependencies
 
 # Run (from project root)
 ./start.sh
@@ -403,7 +403,7 @@ data/
 **Binary compatibility errors (node_modules)**
 - When syncing between Intel/Apple Silicon Macs:
   ```bash
-  rm -rf frontend/node_modules && cd frontend && npm install
+  rm -rf frontend/node_modules && npm install --prefix frontend
   ```
 
 **Logs:**

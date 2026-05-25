@@ -21,7 +21,7 @@ cd llm-council-plus
 
 # Install dependencies
 uv sync
-cd frontend && npm install && cd ..
+npm install --prefix frontend
 
 # Start the app
 ./start.sh
@@ -117,7 +117,7 @@ Choose your deliberation type and depth:
 | Models not appearing | Check provider is enabled in Council Config |
 | Rate limit errors | Use Groq (14k/day) or Ollama (unlimited) |
 | Port conflict | Backend uses 8001, frontend uses 5173 |
-| node_modules errors | `rm -rf frontend/node_modules && cd frontend && npm install` |
+| node_modules errors | `rm -rf frontend/node_modules && npm install --prefix frontend` |
 
 ---
 
