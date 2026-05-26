@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: llm-council-plus
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: starter
+    region: oregon
+    branch: main
+    healthCheckPath: /api/health
+    envVars:
+      - key: PORT
+        value: 8001
+      - key: BACKEND_HOST
+        value: ""
+      - key: FRONTEND_HOST
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: TINYFISH_API_KEY
+        sync: false
+    disk:
+      name: council-data
+      mountPath: /app/data
+      sizeGB: 1
